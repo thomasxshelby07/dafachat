@@ -1,0 +1,10 @@
+{
+  "name": "DAFAX Bet Support",
+  "short_name": "DAFAX Support",
+  "description": "Real-time Customer Support & Lead Management Platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F7F8FC",
+  "theme_color": "#635BFF",
+  "orientation": "portrait-primary"
+}
