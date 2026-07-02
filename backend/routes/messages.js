@@ -123,6 +123,20 @@ router.post('/', auth, async (req, res) => {
       io.to(chatId).emit('new_message', message.toObject());
     }
 
+    // If sender is customer and agent is offline/break, trigger grace period reassignment timer!
+    if (req.user.role === 'customer' && chat.agentId) {
+      const User = require('../models/User');
+      const agent = await User.findById(chat.agentId);
+      if (agent && (agent.status === 'offline' || agent.status === 'break')) {
+        const { triggerGracePeriodForLead } = require('../utils/activitySystem');
+        const Lead = require('../models/Lead');
+        const leadObj = await Lead.findOne({ chatId: chat._id });
+        if (leadObj) {
+          triggerGracePeriodForLead(leadObj, agent, io);
+        }
+      }
+    }
+
     res.status(201).json({ message });
   } catch (error) {
     res.status(500).json({ error: 'Failed to send message' });

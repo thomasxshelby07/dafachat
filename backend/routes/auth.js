@@ -29,8 +29,8 @@ const setRefreshTokenCookie = (res, token) => {
   res.cookie('refreshToken', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
-    maxAge: 7 * 24 * 60 * 60 * 1000,
+    sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+    maxAge: 365 * 24 * 60 * 60 * 1000, // 365 days (1 year)
   });
 };
 
@@ -232,7 +232,16 @@ router.post('/logout', auth, async (req, res) => {
 // Get current user
 router.get('/me', auth, async (req, res) => {
   try {
-    res.json({ user: req.user });
+    let userObj = req.user.toJSON();
+    if (req.user.role === 'customer') {
+      const customer = await Customer.findOne({ userId: req.user._id });
+      if (customer) {
+        userObj.dafaxbetId = customer.dafaxbetId;
+        userObj.customerId = customer._id;
+        userObj.customerNumber = customer.customerId;
+      }
+    }
+    res.json({ user: userObj });
   } catch (error) {
     res.status(500).json({ error: 'Failed to get user' });
   }
@@ -314,4 +323,279 @@ router.post('/check-availability', async (req, res) => {
   }
 });
 
+// Smart Login/Register — Customer only, no password needed
+// flow = 'existing' → both dafaxbetId AND mobile must match same record → login
+// flow = 'new'      → if both match same record → error (already exists). If not → create → login
+router.post('/smart-login', async (req, res) => {
+  try {
+    const { mobile, dafaxbetId, flow } = req.body;
+
+    if (!mobile || !dafaxbetId) {
+      return res.status(400).json({ error: 'Mobile number and DAFA ID are required' });
+    }
+    if (!flow || !['existing', 'new'].includes(flow)) {
+      return res.status(400).json({ error: 'flow must be "existing" or "new"' });
+    }
+
+    const formattedMobile = mobile.trim().startsWith('+91') ? mobile.trim() : `+91${mobile.trim()}`;
+    const cleanDafaId = dafaxbetId.trim();
+
+    // --- Find customer record by mobile first ---
+    let matchedCustomer = await Customer.findOne({ mobile: formattedMobile }).populate('userId');
+
+    // ===== EXISTING FLOW =====
+    if (flow === 'existing') {
+      if (!matchedCustomer || !matchedCustomer.userId) {
+        return res.status(404).json({
+          error: 'You are not an existing customer. Please continue as a New Customer.',
+          suggestNew: true,
+        });
+      }
+
+      // Check if they need to link their Dafa ID (if they were a lead)
+      if (!matchedCustomer.dafaxbetId || matchedCustomer.dafaxbetId.trim() === '') {
+        // Verify this Dafa ID is not already used
+        const duplicateDafa = await Customer.findOne({
+          dafaxbetId: { $regex: new RegExp('^' + cleanDafaId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+        });
+        if (duplicateDafa) {
+          return res.status(409).json({ error: 'This Dafa ID is already linked to another mobile number.' });
+        }
+
+        matchedCustomer.dafaxbetId = cleanDafaId;
+        matchedCustomer.fullName = cleanDafaId;
+        await matchedCustomer.save();
+
+        if (matchedCustomer.userId) {
+          matchedCustomer.userId.fullName = cleanDafaId;
+          await matchedCustomer.userId.save();
+        }
+      } else {
+        // If they already have a Dafa ID, verify it matches
+        const isMatch = matchedCustomer.dafaxbetId.toLowerCase() === cleanDafaId.toLowerCase();
+        if (!isMatch) {
+          return res.status(409).json({
+            error: 'This mobile number is already linked to a different Dafa ID. Please enter the correct Dafa ID.',
+          });
+        }
+      }
+
+      const user = matchedCustomer.userId;
+
+      if (user.role !== 'customer') {
+        return res.status(403).json({ error: 'Access denied.' });
+      }
+      if (!user.isActive) {
+        return res.status(403).json({ error: 'Your account is deactivated. Please contact support.' });
+      }
+
+      user.lastLogin = new Date();
+      await user.save();
+
+      const { accessToken, refreshToken } = generateTokens(user._id);
+      setRefreshTokenCookie(res, refreshToken);
+
+      logger.info(`Smart login (existing customer): ${formattedMobile}`);
+
+      const userObj = user.toJSON();
+      userObj.dafaxbetId = matchedCustomer.dafaxbetId;
+      userObj.customerId = matchedCustomer._id;
+      userObj.customerNumber = matchedCustomer.customerId;
+
+      return res.json({
+        message: 'Welcome back!',
+        isNewUser: false,
+        user: userObj,
+        accessToken,
+      });
+    }
+
+    // ===== NEW CUSTOMER FLOW =====
+    if (flow === 'new') {
+      // If customer already exists in DB (even if they were a lead or normal client)
+      if (matchedCustomer) {
+        return res.status(409).json({
+          error: 'You are already registered. Please continue as an Existing Customer.',
+          suggestExisting: true,
+        });
+      }
+
+      // Also check: DAFA ID already registered with a different mobile
+      const dafaCustomer = await Customer.findOne({
+        dafaxbetId: { $regex: new RegExp('^' + cleanDafaId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+      });
+      if (dafaCustomer) {
+        return res.status(409).json({
+          error: 'This DAFA ID is already linked to a different mobile number. Please continue as an Existing Customer.',
+          suggestExisting: true,
+        });
+      }
+
+      // --- AUTO-REGISTER NEW USER ---
+      const newUser = new User({
+        fullName: cleanDafaId,
+        mobile: formattedMobile,
+        role: 'customer',
+      });
+      await newUser.save();
+
+      const newCustomer = new Customer({
+        userId: newUser._id,
+        fullName: cleanDafaId,
+        mobile: formattedMobile,
+        dafaxbetId: cleanDafaId,
+      });
+      await newCustomer.save();
+
+      const lead = new Lead({
+        customerId: newCustomer._id,
+        status: 'new',
+        timeline: [{
+          event: 'Lead created on customer verification',
+          date: new Date(),
+          by: newUser._id,
+        }],
+      });
+      await lead.save();
+
+      const { accessToken, refreshToken } = generateTokens(newUser._id);
+      setRefreshTokenCookie(res, refreshToken);
+
+      logger.info(`Smart login (new customer created): ${formattedMobile} / ${cleanDafaId}`);
+
+      return res.status(201).json({
+        message: 'Welcome! Connecting you to support...',
+        isNewUser: true,
+        user: newUser.toJSON(),
+        accessToken,
+      });
+    }
+  } catch (error) {
+    logger.error('Smart login error:', error);
+    res.status(500).json({ error: 'Something went wrong. Please try again.' });
+  }
+});
+
+// Lead Registration
+router.post('/lead-register', async (req, res) => {
+  try {
+    const { fullName, mobile } = req.body;
+
+    if (!fullName || !mobile) {
+      return res.status(400).json({ error: 'Name and mobile number are required' });
+    }
+
+    const formattedMobile = mobile.trim().startsWith('+91') ? mobile.trim() : `+91${mobile.trim()}`;
+
+    const existingUser = await User.findOne({ mobile: formattedMobile });
+    if (existingUser) {
+      return res.status(409).json({ error: 'Mobile number already registered. Please login.' });
+    }
+
+    const user = new User({
+      fullName: fullName.trim(),
+      mobile: formattedMobile,
+      role: 'customer',
+    });
+    await user.save();
+
+    const customer = new Customer({
+      userId: user._id,
+      fullName: user.fullName,
+      mobile: user.mobile,
+      dafaxbetId: '', // initially empty, indicating "New Lead / No Customer"
+    });
+    await customer.save();
+
+    const lead = new Lead({
+      customerId: customer._id,
+      status: 'new',
+      issueType: 'new_id',
+      timeline: [{
+        event: 'New Lead registered for ID creation',
+        date: new Date(),
+        by: user._id,
+      }],
+    });
+    await lead.save();
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    setRefreshTokenCookie(res, refreshToken);
+
+    logger.info(`New lead registered: ${formattedMobile}`);
+
+    const userObj = user.toJSON();
+    userObj.dafaxbetId = '';
+    userObj.customerId = customer._id;
+    userObj.customerNumber = customer.customerId;
+
+    res.status(201).json({
+      message: 'Registration successful',
+      user: userObj,
+      customer: customer.toJSON(),
+      accessToken,
+    });
+  } catch (error) {
+    logger.error('Lead registration error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Lead Login
+router.post('/lead-login', async (req, res) => {
+  try {
+    const { mobile } = req.body;
+
+    if (!mobile) {
+      return res.status(400).json({ error: 'Mobile number is required' });
+    }
+
+    const formattedMobile = mobile.trim().startsWith('+91') ? mobile.trim() : `+91${mobile.trim()}`;
+
+    const customer = await Customer.findOne({ mobile: formattedMobile }).populate('userId');
+    if (!customer || !customer.userId) {
+      return res.status(404).json({ error: 'This mobile number is not registered. Please register first.' });
+    }
+
+    if (customer.dafaxbetId && customer.dafaxbetId.trim() !== '') {
+      return res.status(400).json({
+        error: 'Your ID is active. Please login with your Dafa ID and mobile number on Customer Care.',
+        isClient: true,
+        dafaxbetId: customer.dafaxbetId
+      });
+    }
+
+    const user = customer.userId;
+    if (!user.isActive) {
+      return res.status(403).json({ error: 'Your account is deactivated. Please contact support.' });
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    setRefreshTokenCookie(res, refreshToken);
+
+    logger.info(`Lead logged in: ${formattedMobile}`);
+
+    const userObj = user.toJSON();
+    userObj.dafaxbetId = '';
+    userObj.customerId = customer._id;
+    userObj.customerNumber = customer.customerId;
+
+    res.json({
+      message: 'Login successful',
+      user: userObj,
+      customer: customer.toJSON(),
+      accessToken,
+    });
+  } catch (error) {
+    logger.error('Lead login error:', error);
+    res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+
 module.exports = router;
+
+

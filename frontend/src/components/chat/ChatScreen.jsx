@@ -24,6 +24,25 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
   const [showNotesSidebar, setShowNotesSidebar] = useState(false);
   const prevMessagesLengthRef = useRef(0);
   const lastMessageIdRef = useRef(null);
+  const [onlineAgents, setOnlineAgents] = useState([]);
+  const [loadingOnlineAgents, setLoadingOnlineAgents] = useState(false);
+
+  useEffect(() => {
+    if (user?.role === 'customer' && chat?.agentId && (chat.agentId.status === 'offline' || chat.agentId.status === 'break')) {
+      const fetchOnlineAgents = async () => {
+        setLoadingOnlineAgents(true);
+        try {
+          const res = await api.get('/api/users/agents/online');
+          setOnlineAgents(res.data.agents || []);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoadingOnlineAgents(false);
+        }
+      };
+      fetchOnlineAgents();
+    }
+  }, [chat?.agentId?.status, user?.role, chatId]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -159,6 +178,14 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
       }
     };
 
+    const handleAgentAssignedSocket = (data) => {
+      if (data.chatId === chatId) {
+        api.get(`/api/chats/${chatId}`).then(res => {
+          setChat(res.data.chat);
+        }).catch(() => {});
+      }
+    };
+
     on('new_message', handleNewMessage);
     on('message_delivered', handleMessageDelivered);
     on('user_typing', handleUserTyping);
@@ -166,6 +193,8 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
     on('message_read', handleMessageRead);
     on('message_status_changed', handleMessageStatusChanged);
     on('message_deleted', handleMessageDeleted);
+    on('agent_assigned', handleAgentAssignedSocket);
+    on('agent_on_break', handleAgentAssignedSocket);
 
     return () => {
       off('new_message', handleNewMessage);
@@ -175,6 +204,8 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
       off('message_read', handleMessageRead);
       off('message_status_changed', handleMessageStatusChanged);
       off('message_deleted', handleMessageDeleted);
+      off('agent_assigned', handleAgentAssignedSocket);
+      off('agent_on_break', handleAgentAssignedSocket);
     };
   }, [chatId, user, on, off, markRead]);
 
@@ -398,13 +429,69 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
           <div ref={messagesEndRef} />
         </div>
 
-        <ChatInput
-          onSend={handleSend}
-          onTypingStart={handleTypingStart}
-          onTypingStop={handleTypingStop}
-          isAgent={user?.role !== 'customer'}
-          showQuickReplies={user?.role !== 'customer'}
-        />
+        {user?.role === 'customer' && chat?.agentId && (chat.agentId.status === 'offline' || chat.agentId.status === 'break') ? (
+          <div className="bg-surface border-t border-border p-4 space-y-3">
+            <div className="bg-warning/10 border border-warning/30 text-warning px-3.5 py-3 rounded-lg text-xs space-y-1">
+              <p className="font-semibold text-text-1">⚠️ This agent is offline/on break right now. You can connect with other active agents below:</p>
+              <p className="font-semibold font-hindi text-text-1">यह एजेंट अभी ऑफलाइन/ब्रेक पर है। आप नीचे दिए गए सक्रिय (ऑनलाइन) एजेंटों से जुड़ सकते हैं:</p>
+            </div>
+            
+            <div className="space-y-2 max-h-56 overflow-y-auto">
+              {loadingOnlineAgents ? (
+                <div className="text-center text-xs text-text-3 py-4">Checking online agents...</div>
+              ) : onlineAgents.length === 0 ? (
+                <div className="text-center text-xs text-text-3 py-4 italic">No other agents are online right now. DAFA SUPPORT will assist you shortly.</div>
+              ) : (
+                onlineAgents.map(ag => (
+                  <div key={ag._id} className="flex items-center justify-between p-2.5 bg-bg/50 border border-border rounded-lg hover:bg-bg/85 transition-all">
+                    <div className="flex items-center gap-3">
+                      {ag.avatar ? (
+                        <img src={ag.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-success/30" />
+                      ) : (
+                        <div className="w-9 h-9 bg-primary text-white text-xs font-bold rounded-full flex items-center justify-center">
+                          {ag.fullName?.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-xs font-bold text-text-1">{ag.fullName}</div>
+                        <div className="flex flex-wrap gap-1 mt-0.5">
+                          {(ag.permissions?.issueTypes && ag.permissions.issueTypes.length > 0 ? ag.permissions.issueTypes : ['deposit', 'withdrawal', 'other']).map(tag => (
+                            <span key={tag} className="px-1.5 py-0.2 bg-primary/10 text-primary text-[8px] font-bold uppercase rounded">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.post(`/api/chats/${chatId}/transfer-self`, { agentId: ag._id });
+                          const chatRes = await api.get(`/api/chats/${chatId}`);
+                          setChat(chatRes.data.chat);
+                        } catch (e) {
+                          alert('Failed to connect to agent');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-dark transition-all"
+                    >
+                      Connect / मुझे इससे बात करनी है
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        ) : (
+          <ChatInput
+            onSend={handleSend}
+            onTypingStart={handleTypingStart}
+            onTypingStop={handleTypingStop}
+            isAgent={user?.role !== 'customer'}
+            showQuickReplies={user?.role !== 'customer'}
+          />
+        )}
       </div>
 
       {/* Right Sticky Internal Notes Sidebar */}

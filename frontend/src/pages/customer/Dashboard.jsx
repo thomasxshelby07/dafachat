@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../hooks/api';
@@ -64,6 +64,9 @@ const CustomerDashboard = () => {
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   const [faqOpenIndex, setFaqOpenIndex] = useState(null);
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
+  const [broadcasts, setBroadcasts] = useState([]);
+  const [upgradedDafaId, setUpgradedDafaId] = useState(null);
+  const pendingPrefilledMessageRef = useRef(false);
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission !== 'granted') {
@@ -95,6 +98,32 @@ const CustomerDashboard = () => {
     loadBannersAndAnnouncements();
   }, []);
 
+  const loadBroadcasts = async () => {
+    try {
+      const res = await api.get('/api/broadcasts/active');
+      setBroadcasts(res.data.broadcasts || []);
+    } catch (e) {
+      console.error('Failed to load broadcasts:', e);
+    }
+  };
+
+  useEffect(() => {
+    if (broadcasts.length > 0) {
+      broadcasts.forEach(b => {
+        if (!b.viewed) {
+          api.post(`/api/broadcasts/${b._id}/view`).catch(() => {});
+        }
+      });
+    }
+  }, [broadcasts]);
+
+  const handleBroadcastClick = async (broadcast) => {
+    try {
+      await api.post(`/api/broadcasts/${broadcast._id}/click`);
+    } catch (e) {}
+    window.open(broadcast.buttonLink, '_blank');
+  };
+
   // Banner slideshow auto-play
   useEffect(() => {
     if (banners.length <= 1) return;
@@ -112,6 +141,7 @@ const CustomerDashboard = () => {
 
   useEffect(() => {
     loadChats();
+    loadBroadcasts();
     requestNotificationPermission();
     const handleOpenChat = (e) => {
       const chatId = e.detail?.chatId;
@@ -124,7 +154,16 @@ const CustomerDashboard = () => {
     return () => window.removeEventListener('open-chat', handleOpenChat);
   }, [isConnected, joinRoom]);
 
-  useEffect(() => { if (reconnected > 0) loadChats(); }, [reconnected]);
+  useEffect(() => { if (reconnected > 0) { loadChats(); loadBroadcasts(); } }, [reconnected]);
+
+  useEffect(() => {
+    if (user?.dafaxbetId && localStorage.getItem('leadSession') === 'true') {
+      alert("You already have an ID. Please login on Customer Care.");
+      logout();
+      localStorage.removeItem('leadSession');
+      window.location.href = '/login';
+    }
+  }, [user, logout]);
 
   useEffect(() => {
     const handleChatJoined = (data) => {
@@ -133,6 +172,16 @@ const CustomerDashboard = () => {
       setShowIssueSelector(false);
       loadChats();
       setActiveChat({ _id: data.chatId, ...data.chat });
+
+      if (pendingPrefilledMessageRef.current) {
+        sendMessage({
+          chatId: data.chatId,
+          content: "Sir, I need a manual ID. / सर, मुझे मैन्युअल आईडी चाहिए।",
+          type: 'text',
+          isInternal: false
+        });
+        pendingPrefilledMessageRef.current = false;
+      }
     };
     const handleChatClosed = (data) => { loadChats(); };
     const handleAgentAssigned = () => loadChats();
@@ -145,6 +194,10 @@ const CustomerDashboard = () => {
       setShowIssueSelector(false);
     };
     const handleAnnouncementsChanged = () => loadBannersAndAnnouncements();
+    const handleNewBroadcast = () => loadBroadcasts();
+    const handleLeadUpgraded = (data) => {
+      setUpgradedDafaId(data.dafaxbetId);
+    };
 
     on('chat_joined', handleChatJoined);
     on('chat_closed', handleChatClosed);
@@ -154,6 +207,8 @@ const CustomerDashboard = () => {
     on('chat_read', handleChatRead);
     on('message_read', handleChatRead);
     on('announcements_changed', handleAnnouncementsChanged);
+    on('new_broadcast', handleNewBroadcast);
+    on('lead_upgraded', handleLeadUpgraded);
     on('error', handleError);
     return () => {
       off('chat_joined', handleChatJoined);
@@ -164,6 +219,8 @@ const CustomerDashboard = () => {
       off('chat_read', handleChatRead);
       off('message_read', handleChatRead);
       off('announcements_changed', handleAnnouncementsChanged);
+      off('new_broadcast', handleNewBroadcast);
+      off('lead_upgraded', handleLeadUpgraded);
       off('error', handleError);
     };
   }, [on, off]);
@@ -171,13 +228,45 @@ const CustomerDashboard = () => {
   const handleStartChat = async () => {
     if (!isConnected) { alert('Connecting to server, please wait...'); return; }
     await requestNotificationPermission();
-    setShowIssueSelector(true);
+    if (!user?.dafaxbetId || user.dafaxbetId.trim() === '') {
+      handleManualIdStart();
+    } else {
+      setShowIssueSelector(true);
+    }
   };
 
   const handleIssueSelect = (issueType) => {
     setSelectedIssueKey(issueType);
     setStartingChat(true);
     startChat(issueType);
+  };
+
+  const handleAutoIdRedirect = () => {
+    const link = homepage.autoIdLink && homepage.autoIdLink !== '#' ? homepage.autoIdLink : 'https://dafaxbet.com/register';
+    window.open(link, '_blank');
+  };
+
+  const handleManualIdStart = () => {
+    if (!isConnected) { alert('Connecting to server, please wait...'); return; }
+    pendingPrefilledMessageRef.current = true;
+    setStartingChat(true);
+    startChat('new_id');
+  };
+
+  const handleLinkExistingId = async () => {
+    const dafaId = window.prompt("Enter your existing Dafa ID:");
+    if (!dafaId || !dafaId.trim()) return;
+
+    try {
+      const res = await api.post('/api/leads/request-link', { dafaxbetId: dafaId.trim() });
+      alert(`Verification Request Submitted!\n\nYour request to link Dafa ID: ${dafaId.trim()} has been sent to our agent. They will verify and link it shortly. Please check the support chat.`);
+      if (res.data.chatId) {
+        loadChats();
+        if (isConnected) joinRoom(res.data.chatId);
+      }
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to submit request");
+    }
   };
 
   const handleSelectChat = (chat) => { setActiveChat(chat); if (isConnected) joinRoom(chat._id); };
@@ -202,6 +291,41 @@ const CustomerDashboard = () => {
             onMenuClick={() => {}} 
           />
         </div>
+
+        {upgradedDafaId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+            <div className="bg-surface border border-border/60 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl animate-scale-in">
+              <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-4 border border-success/20 animate-bounce">
+                <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-bold text-text-1 mb-2">🎉 Account Upgraded!</h3>
+              <p className="text-sm text-text-2 mb-4 leading-relaxed">
+                Your Player ID has been successfully created.
+              </p>
+              <div className="bg-bg border border-border/80 rounded-lg p-3.5 mb-5 select-all">
+                <span className="text-[11px] uppercase tracking-wider text-text-3 font-semibold block mb-1">Your Dafa ID</span>
+                <span className="text-xl font-extrabold text-primary font-mono block tracking-wider animate-pulse" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                  {upgradedDafaId}
+                </span>
+              </div>
+              <p className="text-[11px] text-text-3 mb-5 leading-normal">
+                For security, please log out and log in again using <span className="font-semibold">Customer Care</span> with your Dafa ID and mobile number for further support, deposits, and withdrawals.
+              </p>
+              <button
+                onClick={async () => {
+                  await logout();
+                  window.location.href = '/login';
+                }}
+                className="w-full py-3 px-4 font-bold rounded-xl text-white shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+                style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
+              >
+                Continue to Login
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -421,26 +545,61 @@ const CustomerDashboard = () => {
               )}
             </div>
 
+
             {/* Welcome message */}
             <div className="px-4 pt-5 pb-1">
-              <h2 className="text-lg font-bold text-text-1">{homepage.welcomeText || 'Welcome to Support'}</h2>
-              <p className="text-xs text-text-2 mt-0.5">{homepage.supportHeader || 'How can we help you?'}</p>
+              <h2 className="text-lg font-bold text-text-1">
+                {!user?.dafaxbetId ? 'Get Your New ID' : (homepage.welcomeText || 'Welcome to Support')}
+              </h2>
+              <p className="text-xs text-text-2 mt-0.5">
+                {!user?.dafaxbetId ? 'Connect with a specialist to set up your new account.' : (homepage.supportHeader || 'How can we help you?')}
+              </p>
             </div>
 
             {/* Start Chat Button */}
-            <div className="px-4 py-2">
-              <button
-                onClick={handleStartChat}
-                disabled={startingChat}
-                className="w-full text-white font-bold py-3.5 rounded-xl transition-all shadow active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
-                style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = branding.secondaryColor || '#991B1B'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = branding.primaryColor || '#B91C1C'}
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                Start New Chat
-              </button>
-            </div>
+            {!user?.dafaxbetId ? (
+              <div className="px-4 py-2 flex flex-col gap-3">
+                {/* Auto ID Button */}
+                <button
+                  onClick={handleAutoIdRedirect}
+                  className="w-full text-white font-bold py-3.5 rounded-xl transition-all shadow active:scale-[0.98] flex items-center justify-center gap-2 border-0 cursor-pointer text-sm"
+                  style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
+                >
+                  ⚡ AUTO CREATE ID
+                </button>
+
+                {/* Manual ID Button */}
+                <button
+                  onClick={handleManualIdStart}
+                  disabled={startingChat}
+                  className="w-full bg-surface text-text-1 font-bold py-3.5 border border-border rounded-xl transition-all shadow active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer text-sm"
+                >
+                  💬 CHAT FOR MANUAL ID
+                </button>
+
+                {/* I Already Have ID Button */}
+                <button
+                  onClick={handleLinkExistingId}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 border border-slate-200 rounded-xl transition-all shadow active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer text-sm"
+                >
+                  🔑 I ALREADY HAVE A DAFA ID
+                </button>
+              </div>
+            ) : (
+              <div className="px-4 py-2">
+                <button
+                  onClick={handleStartChat}
+                  disabled={startingChat}
+                  className="w-full text-white font-bold py-3.5 rounded-xl transition-all shadow active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-sm"
+                  style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = branding.secondaryColor || '#991B1B'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = branding.primaryColor || '#B91C1C'}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                  Start New Chat
+                </button>
+              </div>
+            )}
 
             {/* Active Chat Card */}
             {chats.filter(c => c.status === 'active').map(chat => (
@@ -454,7 +613,7 @@ const CustomerDashboard = () => {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-semibold text-text-1">DAFAXBET SUPPORT</h3>
+                      <h3 className="text-sm font-semibold text-text-1">{branding.companyName ? `${branding.companyName.toUpperCase()} SUPPORT` : 'SUPPORT'}</h3>
                       {(chat.unreadCount || 0) > 0 && <span className="min-w-[20px] h-5 px-1.5 bg-danger rounded-full flex items-center justify-center"><span className="text-[10px] font-bold text-white">{chat.unreadCount > 9 ? '9+' : chat.unreadCount}</span></span>}
                     </div>
                     <p className="text-xs text-text-2 truncate mt-0.5">{chat.lastMessage?.content || 'Tap to open chat'}</p>
@@ -487,6 +646,64 @@ const CustomerDashboard = () => {
               </div>
             )}
 
+            {/* Broadcast Cards */}
+            {broadcasts.length > 0 && (
+              <div className="px-4 pt-5 pb-2 border-t border-border/60 mt-5">
+                <div className="flex items-center justify-between mb-3.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-1 h-3.5" style={{ backgroundColor: branding.primaryColor || '#B91C1C' }} />
+                    <p className="text-xs font-bold text-text-1 uppercase tracking-wider">Announcements</p>
+                  </div>
+                  {broadcasts.filter(b => !b.viewed).length > 0 && (
+                    <span className="px-2 py-0.5 bg-danger text-white rounded text-[8px] font-extrabold tracking-wider animate-pulse shadow-sm">
+                      {broadcasts.filter(b => !b.viewed).length} NEW
+                    </span>
+                  )}
+                </div>
+                
+                <div className="space-y-4">
+                  {broadcasts.map(b => (
+                    <div key={b._id} className="bg-surface border border-border rounded-none shadow-sm flex flex-col hover:shadow-md transition-shadow relative">
+                      {!b.viewed && (
+                        <div className="absolute top-3 left-3 z-10 px-2 py-0.5 bg-danger text-white rounded text-[8px] font-extrabold shadow-sm tracking-wide">
+                          NEW
+                        </div>
+                      )}
+                      
+                      {b.image && (
+                        <div className="relative w-full h-32 overflow-hidden bg-bg/50">
+                          <img src={b.image} alt={b.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-105" />
+                        </div>
+                      )}
+                      
+                      <div className="p-4 flex flex-col justify-between flex-1">
+                        <div className="border-l-2 pl-3 mb-2" style={{ borderColor: branding.primaryColor || '#B91C1C' }}>
+                          <h4 className="text-xs font-extrabold text-text-1 uppercase tracking-wide">{b.title}</h4>
+                        </div>
+                        
+                        {b.content && (
+                          <p className="text-[11px] text-text-2 leading-relaxed mb-3.5 pl-3">{b.content}</p>
+                        )}
+                        
+                        {b.buttonText && b.buttonLink && (
+                          <button
+                            onClick={() => handleBroadcastClick(b)}
+                            className="w-full btn-primary font-bold py-2.5 rounded-none text-[10px] uppercase tracking-widest flex items-center justify-center gap-1.5 hover:brightness-110 active:scale-[0.98] transition-all shadow-sm"
+                            style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
+                          >
+                            <span>{b.buttonText}</span>
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                            </svg>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Profile */}
             <div className="px-4 pt-4">
               <div className="bg-surface border border-border p-4 flex items-center gap-3">
@@ -504,12 +721,12 @@ const CustomerDashboard = () => {
                 <div className="px-4 pt-6 pb-2">
                   <p className="text-xs font-semibold text-text-3 uppercase tracking-wider mb-3">Help & FAQ</p>
                   <div className="space-y-2">
-                    {[
+                    {(homepage.faqs || [
                       { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },
                       { q: 'How long does a withdrawal take?', a: 'Withdrawals are processed within 15-30 minutes. If there is a delay, please contact support by opening a "Withdrawal Issue" chat.' },
                       { q: 'How do I verify my account?', a: 'Upload a clear copy of your Identity document in your profile settings or share it directly with our support agent in chat.' },
                       { q: 'Is my personal data secure?', a: 'Yes, we use global bank-grade encryption to protect all your account data.' },
-                    ].map((faq, idx) => (
+                    ]).map((faq, idx) => (
                       <div key={idx} className="border border-border bg-surface">
                         <button
                           onClick={() => setFaqOpenIndex(faqOpenIndex === idx ? null : idx)}
@@ -542,6 +759,41 @@ const CustomerDashboard = () => {
           </>
         )}
       </main>
+
+      {upgradedDafaId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-surface border border-border/60 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
+            <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-4 border border-success/20 animate-bounce">
+              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-text-1 mb-2">🎉 Account Upgraded!</h3>
+            <p className="text-sm text-text-2 mb-4 leading-relaxed">
+              Your Player ID has been successfully created.
+            </p>
+            <div className="bg-bg border border-border/80 rounded-lg p-3.5 mb-5 select-all">
+              <span className="text-[11px] uppercase tracking-wider text-text-3 font-semibold block mb-1">Your Dafa ID</span>
+              <span className="text-xl font-extrabold text-primary font-mono block tracking-wider animate-pulse" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                {upgradedDafaId}
+              </span>
+            </div>
+            <p className="text-[11px] text-text-3 mb-5 leading-normal">
+              For security, please log out and log in again using <span className="font-semibold">Customer Care</span> with your Dafa ID and mobile number for further support, deposits, and withdrawals.
+            </p>
+            <button
+              onClick={async () => {
+                await logout();
+                window.location.href = '/login';
+              }}
+              className="w-full py-3 px-4 font-bold rounded-xl text-white shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+              style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
+            >
+              Continue to Login
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -101,7 +101,19 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
     };
 
     on('agent_status_changed', handleAgentStatusChanged);
-    return () => off('agent_status_changed', handleAgentStatusChanged);
+    
+    const handleLeadUpdated = (data) => {
+      if (data.lead && data.lead.customerId === chat?.customerId?._id) {
+        setLead(data.lead);
+        if (data.lead.status) setLeadStatus(data.lead.status);
+      }
+    };
+    on('lead_updated', handleLeadUpdated);
+
+    return () => {
+      off('agent_status_changed', handleAgentStatusChanged);
+      off('lead_updated', handleLeadUpdated);
+    };
   }, [chat, on, off]);
 
   const getDisplayName = () => {
@@ -116,7 +128,7 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
         }
         return `${chat.agentId.fullName} (${label})`;
       }
-      return 'DAFAXBET SUPPORT';
+      return branding.companyName ? `${branding.companyName.toUpperCase()} SUPPORT` : 'SUPPORT';
     }
     return otherParty?.fullName || 'Unknown';
   };
@@ -124,7 +136,7 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
   const getStatusText = () => {
     if (isCustomer) {
       if (agentStatus === 'break') return 'Agent on break';
-      return 'DAFAXBET SUPPORT';
+      return branding.companyName ? `${branding.companyName.toUpperCase()} SUPPORT` : 'SUPPORT';
     }
     const mobile = otherParty?.mobile || '';
     return `Phone: ${mobile}`;
@@ -163,6 +175,29 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
     }
   };
 
+  const handleUpgradeLead = async (e) => {
+    e.stopPropagation();
+    if (!lead?._id) {
+      alert("Lead information is loading or not found.");
+      return;
+    }
+    const defaultVal = lead.requestedDafaId || '';
+    const promptMsg = lead.requestedDafaId
+      ? `Verify and Approve Dafa ID for ${otherParty?.fullName || 'this client'}:`
+      : `Enter newly created Dafa ID for ${otherParty?.fullName || 'this client'}:`;
+
+    const dafaId = window.prompt(promptMsg, defaultVal);
+    if (!dafaId || !dafaId.trim()) return;
+
+    try {
+      await api.post(`/api/leads/${lead._id}/upgrade-client`, { dafaxbetId: dafaId.trim() });
+      alert("Lead upgraded to Client successfully!");
+      window.location.reload();
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to upgrade lead");
+    }
+  };
+
   return (
     <div className="bg-surface border-b border-border sticky top-0 z-10">
       <div className="flex items-center gap-3 px-3 h-11">
@@ -198,22 +233,47 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
           </div>
 
           <div className="text-left min-w-0 flex-1">
-            <h2 className="text-sm font-semibold text-text-1 truncate flex items-center gap-2">
+            <h2 className="text-sm font-semibold text-text-1 truncate flex items-center gap-2 flex-wrap">
               <span>{getDisplayName()}</span>
-              {!isCustomer && otherParty?.dafaxbetId && (
-                <span 
-                  onClick={handleCopyId}
-                  title="Click to copy ID"
-                  className="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-primary/10 text-primary border border-primary/20 shrink-0 flex items-center gap-1 active:scale-95 transition-all cursor-pointer select-none" 
-                  style={{ color: branding.primaryColor || '#B91C1C', backgroundColor: `${branding.primaryColor || '#B91C1C'}15`, borderColor: `${branding.primaryColor || '#B91C1C'}30` }}
-                >
-                  <span>{copiedId ? 'Copied! ✓' : `ID: ${otherParty.dafaxbetId}`}</span>
-                  {!copiedId && (
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2" />
-                    </svg>
-                  )}
-                </span>
+              {!isCustomer && (
+                otherParty?.dafaxbetId ? (
+                  <span 
+                    onClick={handleCopyId}
+                    title="Click to copy ID"
+                    className="px-2 py-0.5 text-[10px] font-extrabold uppercase rounded bg-primary/10 text-primary border border-primary/20 shrink-0 flex items-center gap-1 active:scale-95 transition-all cursor-pointer select-none" 
+                    style={{ color: branding.primaryColor || '#B91C1C', backgroundColor: `${branding.primaryColor || '#B91C1C'}15`, borderColor: `${branding.primaryColor || '#B91C1C'}30` }}
+                  >
+                    <span>{copiedId ? 'Copied! ✓' : `ID: ${otherParty.dafaxbetId}`}</span>
+                    {!copiedId && (
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                    )}
+                  </span>
+                ) : (
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {lead?.requestedDafaId ? (
+                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-rose-500/10 text-rose-600 border border-rose-500/20 shrink-0 select-none animate-pulse">
+                        Pending Link: {lead.requestedDafaId}
+                      </span>
+                    ) : (
+                      <span className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-amber-500/10 text-amber-600 border border-amber-500/20 shrink-0 select-none">
+                        New Lead (No ID)
+                      </span>
+                    )}
+                    <button
+                      onClick={handleUpgradeLead}
+                      title={lead?.requestedDafaId ? `Approve Dafa ID: ${lead.requestedDafaId}` : "Set Dafa ID & Upgrade to Client"}
+                      className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-primary text-white hover:opacity-90 active:scale-95 transition-all shrink-0 flex items-center gap-1 border border-primary/20 cursor-pointer select-none"
+                      style={{ 
+                        backgroundColor: lead?.requestedDafaId ? '#10B981' : (branding.primaryColor || '#B91C1C'),
+                        borderColor: lead?.requestedDafaId ? '#10B981' : (branding.primaryColor || '#B91C1C')
+                      }}
+                    >
+                      {lead?.requestedDafaId ? '✅ Verify & Approve' : '🔑 Set ID & Upgrade'}
+                    </button>
+                  </div>
+                )
               )}
             </h2>
             <p className="text-[11px] text-text-3 flex items-center gap-1">

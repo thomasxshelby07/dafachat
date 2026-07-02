@@ -15,6 +15,8 @@ import LeadTable from '../../components/leads/LeadTable';
 import LeadDetail from '../../components/leads/LeadDetail';
 import { requestNotificationPermission } from '../../utils/notifications';
 import { useBranding } from '../../context/BrandingContext';
+import BroadcastManager from '../../components/admin/BroadcastManager';
+import AgentActivityPanel from '../../components/admin/AgentActivityPanel';
 
 const renderSidebarIcon = (key) => {
   const css = "w-4 h-4 flex-shrink-0";
@@ -64,6 +66,20 @@ const renderSidebarIcon = (key) => {
     return (
       <svg className={css} fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+  }
+  if (key === 'agentActivity') {
+    return (
+      <svg className={css} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+    );
+  }
+  if (key === 'broadcast') {
+    return (
+      <svg className={css} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5.882V19.24a1.76 1.76 0 01-3.417.592l-2.147-6.15M18 13a3 3 0 100-6M5.436 13.683A4.001 4.001 0 017 6h1.832c4.1 0 7.625-1.234 9.168-3v18c-1.543-1.766-5.067-3-9.168-3H7a3.988 3.988 0 01-1.564-.317z" />
       </svg>
     );
   }
@@ -164,9 +180,11 @@ const AdminDashboard = () => {
     { key: 'dashboard', label: 'Dashboard', group: 'Overview' },
     { key: 'chats', label: 'All Chats', group: 'Monitor' },
     { key: 'leads', label: 'Leads', group: 'Monitor' },
+    { key: 'agentActivity', label: 'Agent Activity', group: 'Monitor' },
     { key: 'branding', label: 'Branding', group: 'Customization' },
     { key: 'banners', label: 'Banners', group: 'Customization' },
     { key: 'announcements', label: 'Announcements', group: 'Customization' },
+    { key: 'broadcast', label: 'Broadcast', group: 'Communication' },
     { key: 'stickers', label: 'Stickers', group: 'Content' },
     { key: 'users', label: 'All Users', group: 'Users' },
     { key: 'agents', label: 'Agents', group: 'Users' },
@@ -224,6 +242,8 @@ const AdminDashboard = () => {
       case 'users': return <UserManager key="all-users" />;
       case 'agents': return <UserManager key="agents" initialFilter="agent" />;
       case 'managers': return <UserManager key="managers" initialFilter="manager" />;
+      case 'agentActivity': return <AgentActivityPanel />;
+      case 'broadcast': return <BroadcastManager />;
       default: return <AnalyticsDashboard />;
     }
   };

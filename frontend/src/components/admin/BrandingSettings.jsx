@@ -11,6 +11,7 @@ const BrandingSettings = () => {
     footerText: '',
     playNowLabel: 'Play Now',
     playNowUrl: '',
+    autoIdLink: '',
     playNowBgColor: '#635BFF',
     playNowTextColor: '#FFFFFF',
     authBgType: 'gradient',
@@ -22,6 +23,7 @@ const BrandingSettings = () => {
     authLinkColor: '#B91C1C',
     authBtnBgColor: '#B91C1C',
     authBtnTextColor: '#FFFFFF',
+    faqs: [],
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -226,6 +228,17 @@ const BrandingSettings = () => {
                   type="url"
                   value={settings.playNowUrl}
                   onChange={(e) => handleChange('playNowUrl', e.target.value)}
+                  placeholder="https://..."
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-1 mb-1.5">Auto ID Registration Link</label>
+                <input
+                  type="url"
+                  value={settings.autoIdLink}
+                  onChange={(e) => handleChange('autoIdLink', e.target.value)}
                   placeholder="https://..."
                   className="input-field"
                 />
@@ -437,6 +450,69 @@ const BrandingSettings = () => {
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-6 mt-6">
+              <h3 className="text-base font-semibold text-text-1 mb-4">Homepage FAQs Customization</h3>
+              
+              <div className="space-y-4">
+                {(settings.faqs || []).map((faq, idx) => (
+                  <div key={idx} className="p-4 border border-border bg-bg/25 rounded-md space-y-3 relative">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const updated = [...(settings.faqs || [])];
+                        updated.splice(idx, 1);
+                        handleChange('faqs', updated);
+                      }}
+                      className="absolute top-2 right-2 text-danger hover:text-danger-hover text-xs font-semibold"
+                    >
+                      Delete
+                    </button>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-text-2 mb-1">Question {idx + 1}</label>
+                      <input
+                        type="text"
+                        value={faq.q}
+                        onChange={(e) => {
+                          const updated = [...(settings.faqs || [])];
+                          updated[idx] = { ...updated[idx], q: e.target.value };
+                          handleChange('faqs', updated);
+                        }}
+                        className="input-field w-full text-xs"
+                        placeholder="e.g. How do I make a deposit?"
+                      />
+                    </div>
+                    
+                    <div>
+                      <label className="block text-xs font-medium text-text-2 mb-1">Answer {idx + 1}</label>
+                      <textarea
+                        value={faq.a}
+                        onChange={(e) => {
+                          const updated = [...(settings.faqs || [])];
+                          updated[idx] = { ...updated[idx], a: e.target.value };
+                          handleChange('faqs', updated);
+                        }}
+                        className="input-field w-full text-xs h-16 resize-none"
+                        placeholder="Answer text..."
+                      />
+                    </div>
+                  </div>
+                ))}
+                
+                <button
+                  type="button"
+                  onClick={() => {
+                    const updated = [...(settings.faqs || [])];
+                    updated.push({ q: '', a: '' });
+                    handleChange('faqs', updated);
+                  }}
+                  className="px-3 py-1.5 bg-bg border border-border text-xs font-bold text-text-1 hover:bg-bg-hover transition-colors rounded-md"
+                >
+                  + Add FAQ Item
+                </button>
               </div>
             </div>
           </div>

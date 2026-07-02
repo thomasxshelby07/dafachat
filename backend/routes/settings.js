@@ -8,13 +8,13 @@ const router = express.Router();
 
 const defaultSettings = {
   branding: {
-    companyName: 'DAFAX Bet',
+    companyName: 'DAFA Bet',
     logo: '',
     favicon: '',
     primaryColor: '#635BFF',
     secondaryColor: '#4F46E5',
     headerBg: '#111827',
-    footerText: '© 2026 DAFAX Bet. All rights reserved.',
+    footerText: '© 2026 DAFA Bet. All rights reserved.',
     playNowBgColor: '#635BFF',
     playNowTextColor: '#FFFFFF',
     authBgType: 'gradient',
@@ -28,11 +28,18 @@ const defaultSettings = {
     authBtnTextColor: '#FFFFFF',
   },
   homepage: {
-    welcomeText: 'Welcome to DAFAX Support',
+    welcomeText: 'Welcome to DAFA Support',
     supportHeader: 'How can we help you?',
     playNowLabel: 'Play Now',
     playNowUrl: '#',
+    autoIdLink: '#',
     helpText: 'Our support team is available 24/7 to assist you.',
+    faqs: [
+      { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },
+      { q: 'How long does a withdrawal take?', a: 'Withdrawals are processed within 15-30 minutes. If there is a delay, please contact support by opening a "Withdrawal Issue" chat.' },
+      { q: 'How do I verify my account?', a: 'Upload a clear copy of your Identity document in your profile settings or share it directly with our support agent in chat.' },
+      { q: 'Is my personal data secure?', a: 'Yes, we use global bank-grade encryption to protect all your account data.' },
+    ],
   },
   system: {
     maxFileSize: 10,
@@ -41,6 +48,11 @@ const defaultSettings = {
   notifications: {
     enablePush: true,
     enableEmail: false,
+  },
+  agentActivity: {
+    idleTimeout: 10,
+    gracePeriod: 2,
+    enableAutoReassignment: true,
   },
 };
 
@@ -113,6 +125,7 @@ router.patch('/', auth, isManagerOrAbove, async (req, res) => {
       if (defaultSettings.branding && key in defaultSettings.branding) group = 'branding';
       else if (defaultSettings.homepage && key in defaultSettings.homepage) group = 'homepage';
       else if (defaultSettings.notifications && key in defaultSettings.notifications) group = 'notifications';
+      else if (defaultSettings.agentActivity && key in defaultSettings.agentActivity) group = 'agentActivity';
 
       const existing = await Settings.findOne({ key });
 

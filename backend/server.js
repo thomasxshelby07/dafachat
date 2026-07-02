@@ -16,6 +16,7 @@ const Lead = require('./models/Lead');
 const Notification = require('./models/Notification');
 const Banner = require('./models/Banner');
 const Announcement = require('./models/Announcement');
+const Settings = require('./models/Settings');
 const logger = require('./utils/logger');
 
 const app = express();
@@ -46,9 +47,10 @@ const safeRedis = {
   keys: async (pattern) => { try { const r = getRedis(); if (r) return await r.keys(pattern); } catch(e) {} return []; },
 };
 
+const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use(cors({
-  origin: '*',
-  credentials: false,
+  origin: allowedOrigin,
+  credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
 }));
@@ -74,6 +76,7 @@ app.use('/api/banners', require('./routes/banners'));
 app.use('/api/announcements', require('./routes/announcements'));
 app.use('/api/users', require('./routes/users'));
 app.use('/api/analytics', require('./routes/analytics'));
+app.use('/api/broadcasts', require('./routes/broadcasts').router);
 app.use('/api/notifications', require('./routes/notifications'));
 
 app.get('/api/health', (req, res) => {
@@ -83,23 +86,14 @@ app.get('/api/health', (req, res) => {
 app.patch('/api/users/status', require('./middleware/auth'), async (req, res) => {
   try {
     const { status } = req.body;
-    if (!['online', 'away', 'break'].includes(status)) {
+    if (!['online', 'away', 'break', 'offline'].includes(status)) {
       return res.status(400).json({ error: 'Invalid status' });
     }
 
-    const user = await User.findByIdAndUpdate(
-      req.user._id,
-      { status },
-      { new: true }
-    ).select('-passwordHash');
+    const { updateUserStatus } = require('./utils/activitySystem');
+    const user = await updateUserStatus(req.user._id, status, io);
 
-    io.emit('agent_status_changed', {
-      userId: req.user._id,
-      status,
-      fullName: user.fullName,
-    });
-
-    res.json({ user });
+    res.json({ user: user.toJSON() });
   } catch (error) {
     res.status(500).json({ error: 'Failed to update status' });
   }
@@ -165,79 +159,91 @@ const findBestAgent = async (issueType) => {
 
   let candidates = [];
 
-  // Step 1: Look for active, online AGENTS specializing in issueType
-  candidates = await User.find({
-    role: 'agent',
-    isActive: true,
-    status: 'online',
-    'permissions.issueTypes': issueType,
-  }).select('_id fullName status permissions role');
-
-  // Step 2: Look for active, online AGENTS specializing in nothing (handles all)
-  if (candidates.length === 0) {
+  if (issueType === 'new_id') {
+    // Only agents/managers/admins who explicitly have 'new_id' permission
     candidates = await User.find({
-      role: 'agent',
       isActive: true,
       status: 'online',
-      $or: [
-        { 'permissions.issueTypes': { $size: 0 } },
-        { 'permissions.issueTypes': { $exists: false } },
-        { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } },
-      ],
+      role: { $in: ['agent', 'manager', 'super_admin'] },
+      'permissions.issueTypes': 'new_id',
     }).select('_id fullName status permissions role');
-  }
-
-  // Step 3: Look for any active, online AGENTS
-  if (candidates.length === 0) {
+  } else {
+    // Step 1: Look for active, online AGENTS specializing in issueType
     candidates = await User.find({
       role: 'agent',
-      isActive: true,
-      status: 'online',
-    }).select('_id fullName status permissions role');
-  }
-
-  // Step 4: If no active, online AGENTS are available, look for active, online MANAGERS specializing in issueType
-  if (candidates.length === 0) {
-    logger.info(`findBestAgent: No active/online agents. Looking for active/online managers specializing in "${issueType}"`);
-    candidates = await User.find({
-      role: 'manager',
       isActive: true,
       status: 'online',
       'permissions.issueTypes': issueType,
     }).select('_id fullName status permissions role');
-  }
 
-  // Step 5: Look for active, online MANAGERS specializing in nothing (handles all)
-  if (candidates.length === 0) {
-    candidates = await User.find({
-      role: 'manager',
-      isActive: true,
-      status: 'online',
-      $or: [
-        { 'permissions.issueTypes': { $size: 0 } },
-        { 'permissions.issueTypes': { $exists: false } },
-        { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } },
-      ],
-    }).select('_id fullName status permissions role');
-  }
+    // Step 2: Look for active, online AGENTS specializing in nothing (handles all except new_id)
+    if (candidates.length === 0) {
+      candidates = await User.find({
+        role: 'agent',
+        isActive: true,
+        status: 'online',
+        $or: [
+          { 'permissions.issueTypes': { $size: 0 } },
+          { 'permissions.issueTypes': { $exists: false } },
+          { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } },
+        ],
+      }).select('_id fullName status permissions role');
+    }
 
-  // Step 6: Look for any active, online MANAGERS
-  if (candidates.length === 0) {
-    candidates = await User.find({
-      role: 'manager',
-      isActive: true,
-      status: 'online',
-    }).select('_id fullName status permissions role');
-  }
+    // Step 3: Look for any active, online AGENTS who DO NOT have 'new_id' permission
+    if (candidates.length === 0) {
+      candidates = await User.find({
+        role: 'agent',
+        isActive: true,
+        status: 'online',
+        'permissions.issueTypes': { $ne: 'new_id' }
+      }).select('_id fullName status permissions role');
+    }
 
-  // Step 7: Fallback to active, online SUPER ADMINS if absolutely nobody else is available
-  if (candidates.length === 0) {
-    logger.info('findBestAgent: No active/online agents or managers. Looking for active/online super admins');
-    candidates = await User.find({
-      role: 'super_admin',
-      isActive: true,
-      status: 'online',
-    }).select('_id fullName status permissions role');
+    // Step 4: If no active, online AGENTS are available, look for active, online MANAGERS specializing in issueType
+    if (candidates.length === 0) {
+      logger.info(`findBestAgent: No active/online agents. Looking for active/online managers specializing in "${issueType}"`);
+      candidates = await User.find({
+        role: 'manager',
+        isActive: true,
+        status: 'online',
+        'permissions.issueTypes': issueType,
+      }).select('_id fullName status permissions role');
+    }
+
+    // Step 5: Look for active, online MANAGERS specializing in nothing (handles all except new_id)
+    if (candidates.length === 0) {
+      candidates = await User.find({
+        role: 'manager',
+        isActive: true,
+        status: 'online',
+        $or: [
+          { 'permissions.issueTypes': { $size: 0 } },
+          { 'permissions.issueTypes': { $exists: false } },
+          { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } },
+        ],
+      }).select('_id fullName status permissions role');
+    }
+
+    // Step 6: Look for any active, online MANAGERS who DO NOT have 'new_id' permission
+    if (candidates.length === 0) {
+      candidates = await User.find({
+        role: 'manager',
+        isActive: true,
+        status: 'online',
+        'permissions.issueTypes': { $ne: 'new_id' }
+      }).select('_id fullName status permissions role');
+    }
+
+    // Step 7: Fallback to active, online SUPER ADMINS if absolutely nobody else is available (who don't have 'new_id' exclusively)
+    if (candidates.length === 0) {
+      logger.info('findBestAgent: No active/online agents or managers. Looking for active/online super admins');
+      candidates = await User.find({
+        role: 'super_admin',
+        isActive: true,
+        status: 'online',
+      }).select('_id fullName status permissions role');
+    }
   }
 
   logger.info(`findBestAgent: found ${candidates.length} candidate active support users`);
@@ -264,10 +270,18 @@ const findBestAgent = async (issueType) => {
 const notifyCustomerNewMessage = async (chat, message, senderUser) => {
   const customer = await Customer.findById(chat.customerId);
   if (customer && customer.userId.toString() !== senderUser._id.toString()) {
+    let compName = 'SUPPORT';
+    try {
+      const compSetting = await Settings.findOne({ key: 'branding' });
+      if (compSetting?.value?.companyName) {
+        compName = `${compSetting.value.companyName.toUpperCase()} SUPPORT`;
+      }
+    } catch (e) {}
+
     const notif = new Notification({
       userId: customer.userId,
       type: 'new_message',
-      title: 'DAFAXBET SUPPORT',
+      title: compName,
       body: `${message.content?.substring(0, 50) || 'Sent a file'}`,
       metadata: { chatId: chat._id, messageId: message._id },
     });
@@ -663,7 +677,7 @@ io.on('connection', async (socket) => {
                   userId: customer.userId,
                   type: 'agent_assigned',
                   title: 'Agent Assigned',
-                  body: `${agent.fullName} (The FX Bet) is now assisting you`,
+                  body: `${agent.fullName} is now assisting you`,
                   metadata: { chatId: freshChat._id, agentId: agent._id },
                 });
                 await customerNotif.save();
@@ -688,6 +702,7 @@ io.on('connection', async (socket) => {
               deposit: 'Hello, I have a deposit issue. My payment is not reflecting in my account.',
               withdrawal: 'Hello, I have a withdrawal issue. My withdrawal is pending/failed.',
               other: 'Hello, I need help with my account.',
+              new_id: 'Hello, I want to register for a new ID.',
             };
             const autoMsg = welcomeMessages[issueType] || welcomeMessages.other;
 
@@ -761,13 +776,21 @@ io.on('connection', async (socket) => {
 
       socket.join(chatId.toString());
 
-      const customer = await Customer.findById(chat.customerId);
+       const customer = await Customer.findById(chat.customerId);
       if (customer) {
         const customerSocket = userSocketMap[customer.userId.toString()];
         if (customerSocket) {
+          let compName = 'SUPPORT';
+          try {
+            const compSetting = await Settings.findOne({ key: 'branding' });
+            if (compSetting?.value?.companyName) {
+              compName = `${compSetting.value.companyName.toUpperCase()} SUPPORT`;
+            }
+          } catch (e) {}
+
           const agent = await User.findById(userId).select('fullName status');
           io.to(customerSocket).emit('agent_assigned', {
-            agentName: agent.status === 'break' ? 'DAFAXBET SUPPORT' : agent.fullName,
+            agentName: agent.status === 'break' ? compName : agent.fullName,
             chatId,
           });
 
@@ -776,7 +799,7 @@ io.on('connection', async (socket) => {
             userId: customer.userId,
             type: 'agent_assigned',
             title: 'Agent Assigned',
-            body: `DAFAXBET SUPPORT is now assisting you`,
+            body: `${compName} is now assisting you`,
             metadata: { chatId, agentId: userId },
           });
           await notif.save();
@@ -817,31 +840,10 @@ io.on('connection', async (socket) => {
   socket.on('set_status', async (data) => {
     try {
       const { status } = data;
-      if (!['online', 'away', 'break'].includes(status)) return;
+      if (!['online', 'away', 'break', 'offline'].includes(status)) return;
 
-      await User.findByIdAndUpdate(userId, { status });
-
-      io.emit('agent_status_changed', {
-        userId,
-        status,
-        fullName: socket.user.fullName,
-      });
-
-      if (status === 'break') {
-        const chats = await Chat.find({ agentId: userId, status: 'active' });
-        for (const chat of chats) {
-          const customer = await Customer.findById(chat.customerId);
-          if (customer) {
-            const customerSocket = userSocketMap[customer.userId.toString()];
-            if (customerSocket) {
-              io.to(customerSocket).emit('agent_on_break', {
-                chatId: chat._id,
-                message: 'Your agent is on break. DAFAXBET SUPPORT will assist you shortly.',
-              });
-            }
-          }
-        }
-      }
+      const { updateUserStatus } = require('./utils/activitySystem');
+      await updateUserStatus(userId, status, io);
     } catch (error) {
       logger.error('Set status error:', error);
     }
@@ -853,6 +855,11 @@ io.on('connection', async (socket) => {
     await safeRedis.del(`user_socket:${userId}`);
     io.emit('user_status', { userId, status: 'offline' });
     logger.info(`Socket disconnected: ${socket.id} (user: ${userId})`);
+
+    if (userRole !== 'customer') {
+      const { updateUserStatus } = require('./utils/activitySystem');
+      await updateUserStatus(userId, 'offline', io);
+    }
   });
 });
 
@@ -862,6 +869,22 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
+
+  try {
+    const allSettings = await Settings.find();
+    for (const setting of allSettings) {
+      let settingStr = JSON.stringify(setting.value);
+      if (settingStr.includes('DAFAX')) {
+        settingStr = settingStr.replace(/DAFAX/g, 'DAFA');
+        setting.value = JSON.parse(settingStr);
+        setting.markModified('value');
+        await setting.save();
+        logger.info(`Corrected DAFAX to DAFA in settings database record for key: ${setting.key}`);
+      }
+    }
+  } catch (err) {
+    logger.error('Failed to correct seeded branding defaults in database:', err);
+  }
 
   // Auto-seed default banners and announcements if database is empty
   try {
@@ -895,7 +918,7 @@ const startServer = async () => {
       await Announcement.insertMany([
         {
           type: 'scrolling',
-          content: '🔥 Welcome to DAFAX Support! Get 100% Welcome Bonus on your first deposit! 24/7 Live Agent Assistance.',
+          content: '🔥 Welcome to Support! Get 100% Welcome Bonus on your first deposit! 24/7 Live Agent Assistance.',
           isActive: true,
         },
         {
@@ -913,6 +936,28 @@ const startServer = async () => {
   server.listen(PORT, () => {
     logger.info(`Server running on port ${PORT}`);
   });
+
+  // Scheduled broadcasts checker
+  setInterval(async () => {
+    try {
+      const Broadcast = require('./models/Broadcast');
+      const { sendBroadcastInBackground } = require('./routes/broadcasts');
+      
+      const now = new Date();
+      const scheduled = await Broadcast.find({
+        status: 'scheduled',
+        'schedule.type': 'later',
+        'schedule.time': { $lte: now }
+      });
+
+      for (const b of scheduled) {
+        logger.info(`Scheduled broadcast ${b._id} is due. Triggering sending...`);
+        sendBroadcastInBackground(b._id, io);
+      }
+    } catch (err) {
+      logger.error('Error processing scheduled broadcasts:', err);
+    }
+  }, 30000);
 };
 
 startServer();

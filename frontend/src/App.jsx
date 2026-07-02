@@ -2,9 +2,9 @@ import { lazy, Suspense } from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
-const Login = lazy(() => import('./pages/Login'));
+const SmartEntry = lazy(() => import('./pages/SmartEntry'));
+const RegisterLead = lazy(() => import('./pages/RegisterLead'));
 const AdminLogin = lazy(() => import('./pages/AdminLogin'));
-const Register = lazy(() => import('./pages/Register'));
 const CustomerDashboard = lazy(() => import('./pages/customer/Dashboard'));
 const AgentDashboard = lazy(() => import('./pages/agent/Dashboard'));
 const ManagerDashboard = lazy(() => import('./pages/manager/Dashboard'));
@@ -24,20 +24,25 @@ function App() {
     return <LoadingFallback />;
   }
 
+  const customerRedirect = isAuthenticated ? (
+    <Navigate to={
+      user?.role === 'customer' ? '/customer' :
+      user?.role === 'agent' ? '/agent' :
+      user?.role === 'manager' ? '/manager' :
+      user?.role === 'super_admin' ? '/admin' : '/login'
+    } replace />
+  ) : null;
+
   return (
     <Suspense fallback={<LoadingFallback />}>
       <Routes>
+        {/* Smart entry — replaces both /login and /register for customers */}
         <Route path="/login" element={
-          isAuthenticated ? (
-            <Navigate to={
-              user?.role === 'customer' ? '/customer' :
-              user?.role === 'agent' ? '/agent' :
-              user?.role === 'manager' ? '/manager' :
-              user?.role === 'super_admin' ? '/admin' : '/login'
-            } replace />
-          ) : (
-            <Login />
-          )
+          isAuthenticated ? customerRedirect : <SmartEntry />
+        } />
+
+        <Route path="/register" element={
+          isAuthenticated ? customerRedirect : <RegisterLead />
         } />
 
         <Route path="/admin-login" element={
@@ -50,19 +55,6 @@ function App() {
             } replace />
           ) : (
             <AdminLogin />
-          )
-        } />
-
-        <Route path="/register" element={
-          isAuthenticated ? (
-            <Navigate to={
-              user?.role === 'customer' ? '/customer' :
-              user?.role === 'agent' ? '/agent' :
-              user?.role === 'manager' ? '/manager' :
-              user?.role === 'super_admin' ? '/admin' : '/register'
-            } replace />
-          ) : (
-            <Register />
           )
         } />
 

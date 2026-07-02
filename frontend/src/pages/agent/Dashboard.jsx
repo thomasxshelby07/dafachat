@@ -6,6 +6,7 @@ import ChatScreen from '../../components/chat/ChatScreen';
 import ChatList from '../../components/chat/ChatList';
 import NotificationBell from '../../components/NotificationBell';
 import { requestNotificationPermission } from '../../utils/notifications';
+import useIdleTimer from '../../hooks/useIdleTimer';
 
 const ISSUE_LABELS = { deposit: '💳 Deposit', withdrawal: '💸 Withdrawal', other: '💬 General' };
 
@@ -23,6 +24,7 @@ const AgentDashboard = () => {
   const [profileName, setProfileName] = useState(user?.fullName || '');
   const [profileAvatar, setProfileAvatar] = useState(user?.avatar || '');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+
 
   useEffect(() => {
     if (user) {
@@ -106,7 +108,12 @@ const AgentDashboard = () => {
       });
       setActiveChat(prev => prev && prev._id === message.chatId ? { ...prev, lastMessageAt: message.createdAt, lastMessage: { content: message.content } } : prev);
     };
-    const handleAgentStatusChanged = (data) => { setChats(prev => prev.map(c => c.agentId?._id === data.userId ? { ...c, agentId: { ...c.agentId, status: data.status } } : c)); };
+    const handleAgentStatusChanged = (data) => { 
+      setChats(prev => prev.map(c => c.agentId?._id === data.userId ? { ...c, agentId: { ...c.agentId, status: data.status } } : c)); 
+      if (data.userId === user?._id) {
+        setCurrentStatus(data.status);
+      }
+    };
     const handleMessageRead = (data) => { setChats(prev => prev.map(c => c._id === data.chatId ? { ...c, unreadCount: 0 } : c)); };
     const handleLeadReassigned = (data) => {
       loadChats();
@@ -138,6 +145,11 @@ const AgentDashboard = () => {
   }, [on, off, user, isConnected, joinRoom]);
 
   const handleStatusChange = async (status) => { try { await api.patch('/api/users/status', { status }); setCurrentStatus(status); setShowStatusMenu(false); } catch (error) { console.error('Failed to update status:', error); } };
+  
+  useIdleTimer({
+    currentStatus,
+    onStatusChange: handleStatusChange,
+  });
   const handleSelectChat = (chat) => { setActiveChat(chat); if (isConnected) joinRoom(chat._id); };
 
   const filteredChats = chats.filter(chat => {
@@ -151,8 +163,8 @@ const AgentDashboard = () => {
   const activeChatsCount = chats.filter(c => c.status === 'active').length;
   const unreadChatsCount = chats.filter(c => (c.unreadCount || 0) > 0).length;
   const totalUnread = chats.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-  const statusColors = { online: 'bg-emerald-500', away: 'bg-amber-500', break: 'bg-red-500' };
-  const statusLabels = { online: 'Online', away: 'Away', break: 'On Break' };
+  const statusColors = { online: 'bg-emerald-500', away: 'bg-amber-500', break: 'bg-amber-500', offline: 'bg-gray-500' };
+  const statusLabels = { online: 'Online', away: 'Away', break: 'On Break', offline: 'Offline' };
 
   return (
     <div className="h-screen flex bg-bg overflow-hidden">
@@ -202,7 +214,11 @@ const AgentDashboard = () => {
               </button>
               {showStatusMenu && (
                 <div className="absolute left-0 top-full mt-1 w-full bg-surface border border-border shadow-float z-50 overflow-hidden">
-                  {[{ key: 'online', label: 'Online', color: 'bg-emerald-500' }, { key: 'break', label: 'On Break', color: 'bg-red-500' }].map(({ key, label, color }) => (
+                  {[
+                    { key: 'online', label: 'Online', color: 'bg-emerald-500' },
+                    { key: 'break', label: 'On Break', color: 'bg-amber-500' },
+                    { key: 'offline', label: 'Offline', color: 'bg-gray-500' }
+                  ].map(({ key, label, color }) => (
                     <button key={key} onClick={() => handleStatusChange(key)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-bg transition-colors ${currentStatus === key ? 'bg-primary-light' : ''}`}>
                       <div className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-text-1">{label}</span>
                     </button>

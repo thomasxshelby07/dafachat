@@ -109,6 +109,17 @@ const LeadDetail = ({ leadId, onClose, onUpdate }) => {
     }
   };
 
+  const handleDeleteLead = async () => {
+    if (!window.confirm('Are you absolutely sure you want to delete this lead and ALL associated customer data? This cannot be undone.')) return;
+    try {
+      await api.delete(`/api/leads/${leadId}`);
+      onClose();
+      onUpdate?.();
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to delete lead');
+    }
+  };
+
   const handleAddTag = async (tag) => {
     try {
       await api.post(`/api/leads/${leadId}/tags`, { tag });
@@ -190,8 +201,21 @@ const LeadDetail = ({ leadId, onClose, onUpdate }) => {
               <h3 className="text-base font-semibold text-text-1">{lead.customerId?.fullName}</h3>
               <p className="text-xs text-text-2">{lead.customerId?.mobile}</p>
               <p className="text-[11px] text-text-3">ID: {lead.customerId?.customerId}</p>
-              {lead.customerId?.dafaxbetId && (
-                <p className="text-xs font-semibold text-primary">Dafaxbet ID: {lead.customerId.dafaxbetId}</p>
+              {lead.customerId?.dafaxbetId ? (
+                <div className="flex flex-col gap-1 mt-1">
+                  <p className="text-xs font-semibold text-primary">Dafaxbet ID: {lead.customerId.dafaxbetId}</p>
+                  <div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                      Client
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1">
+                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                    No Customer (New Lead)
+                  </span>
+                </div>
               )}
             </div>
           </div>
@@ -410,6 +434,21 @@ const LeadDetail = ({ leadId, onClose, onUpdate }) => {
             ))}
           </div>
         </div>
+
+        {/* Delete Lead Button (Super Admin only) */}
+        {user?.role === 'super_admin' && (
+          <div className="p-4 border-t border-border mt-2 bg-red-50/50">
+            <button
+              onClick={handleDeleteLead}
+              className="w-full py-2.5 px-4 bg-danger text-white rounded-lg text-xs font-bold hover:bg-danger-hover active:scale-95 transition-all shadow-sm flex items-center justify-center gap-1.5"
+            >
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+              Delete Lead & Client Data
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

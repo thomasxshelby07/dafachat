@@ -9,6 +9,8 @@ import LeadDetail from '../../components/leads/LeadDetail';
 import NotificationBell from '../../components/NotificationBell';
 import UserManager from '../../components/admin/UserManager';
 import { requestNotificationPermission } from '../../utils/notifications';
+import BroadcastManager from '../../components/admin/BroadcastManager';
+import AgentActivityPanel from '../../components/admin/AgentActivityPanel';
 
 const ManagerDashboard = () => {
   const { user, logout } = useAuth();
@@ -194,6 +196,8 @@ const ManagerDashboard = () => {
             { key: 'chats', label: 'Chats Workspace' },
             { key: 'leads', label: 'Leads' },
             { key: 'agents', label: 'Agents' },
+            { key: 'agentActivity', label: 'Agent Activity' },
+            { key: 'broadcast', label: 'Broadcasts' },
           ].map(({ key, label }) => (
             <button
               key={key}
@@ -389,6 +393,18 @@ const ManagerDashboard = () => {
         {activeTab === 'agents' && (
           <div className="flex-1 p-6 overflow-y-auto">
             <UserManager key="manager-agents" initialFilter="agent" />
+          </div>
+        )}
+
+        {activeTab === 'agentActivity' && (
+          <div className="flex-1 p-6 overflow-y-auto">
+            <AgentActivityPanel />
+          </div>
+        )}
+
+        {activeTab === 'broadcast' && (
+          <div className="flex-1 p-6 overflow-y-auto">
+            <BroadcastManager />
           </div>
         )}
       </div>

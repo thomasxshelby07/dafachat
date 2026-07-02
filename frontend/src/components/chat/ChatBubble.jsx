@@ -238,6 +238,35 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
 
   const canDelete = viewerRole !== 'customer' && message.senderRole !== 'customer' && onDelete;
 
+  const renderMessageContent = (text) => {
+    if (!text) return null;
+    const markdownLinkRegex = /(\[[^\]]+\]\([^)]+\))/g;
+    const parts = text.split(markdownLinkRegex);
+
+    return parts.map((part, index) => {
+      const match = part.match(/\[([^\]]+)\]\(([^)]+)\)/);
+      if (match) {
+        const linkText = match[1];
+        const linkUrl = match[2];
+        const isExternal = linkUrl.startsWith('http');
+        
+        return (
+          <a
+            key={index}
+            href={linkUrl}
+            target={isExternal ? "_blank" : undefined}
+            rel={isExternal ? "noopener noreferrer" : undefined}
+            className="inline-block bg-primary text-white font-extrabold text-xs px-3.5 py-1.5 rounded-lg shadow-sm hover:brightness-110 active:scale-95 transition-all my-1 text-center decoration-none"
+            style={{ textDecoration: 'none', backgroundColor: 'var(--primary)' }}
+          >
+            🔑 {linkText}
+          </a>
+        );
+      }
+      return part;
+    });
+  };
+
   return (
     <motion.div
       initial={{ opacity: 0, y: 10, scale: 0.97 }}
@@ -272,7 +301,9 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
             </div>
           )}
           {message.content && message.type !== 'audio' && (
-            <p className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">{message.content}</p>
+            <div className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">
+              {renderMessageContent(message.content)}
+            </div>
           )}
           <div className={`flex items-center gap-0.5 mt-0.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
             <span className="text-[10px] text-text-3">

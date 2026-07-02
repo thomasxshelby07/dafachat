@@ -39,7 +39,7 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
     const value = e.target.value;
     setMessage(value);
 
-    if (value === '/') {
+    if (value === '/' && isAgent) {
       setShowQuickReplies(true);
     }
 

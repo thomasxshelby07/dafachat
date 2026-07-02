@@ -11,7 +11,7 @@ const getBaseUrl = () => {
 
 const api = axios.create({
   baseURL: getBaseUrl(),
-  withCredentials: false,
+  withCredentials: true,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -39,7 +39,7 @@ api.interceptors.response.use(
 
       try {
         const response = await axios.post(`${getBaseUrl()}/api/auth/refresh`, {}, {
-          withCredentials: false,
+          withCredentials: true,
         });
 
         const { accessToken } = response.data;

@@ -109,11 +109,21 @@ const NotificationBell = ({ className = 'text-text-2', align = 'right' }) => {
 
   const handleMarkAllRead = async () => {
     try {
-      await api.post('/api/notifications/read-all');
+      await api.patch('/api/notifications/read-all');
       setNotifications(prev => prev.map(n => ({ ...n, isRead: true })));
       setUnreadCount(0);
     } catch (error) {
       console.error('Failed to mark all notifications as read:', error);
+    }
+  };
+
+  const handleClearAll = async () => {
+    try {
+      await api.delete('/api/notifications/clear');
+      setNotifications([]);
+      setUnreadCount(0);
+    } catch (error) {
+      console.error('Failed to clear notifications:', error);
     }
   };
 
@@ -162,11 +172,18 @@ const NotificationBell = ({ className = 'text-text-2', align = 'right' }) => {
           <div className="flex flex-col border-b border-border">
             <div className="flex items-center justify-between px-4 pt-3 pb-2">
               <h3 className="text-sm font-semibold text-text-1">Notifications</h3>
-              {unreadCount > 0 && (
-                <button onClick={handleMarkAllRead} className="text-xs text-primary hover:text-primary-hover">
-                  Mark all read
-                </button>
-              )}
+              <div className="flex gap-2.5">
+                {unreadCount > 0 && (
+                  <button onClick={handleMarkAllRead} className="text-xs text-primary hover:text-primary-hover font-semibold">
+                    Mark all read
+                  </button>
+                )}
+                {notifications.length > 0 && (
+                  <button onClick={handleClearAll} className="text-xs text-danger hover:text-danger-hover font-semibold">
+                    Clear All
+                  </button>
+                )}
+              </div>
             </div>
             {!isCustomer && (
               <div className="px-4 pb-3 flex items-center justify-between border-t border-border/50 pt-2 bg-bg/20">

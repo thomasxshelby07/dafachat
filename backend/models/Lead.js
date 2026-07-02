@@ -14,6 +14,10 @@ const leadSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
+  originalAgent: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  },
   status: {
     type: String,
     enum: ['new', 'assigned', 'in_progress', 'follow_up', 'interested', 'converted', 'closed', 'deposit_done', 'withdrawal_done', 'issue_solved', 'issue_not_solved'],
@@ -21,7 +25,7 @@ const leadSchema = new mongoose.Schema({
   },
   issueType: {
     type: String,
-    enum: ['deposit', 'withdrawal', 'other'],
+    enum: ['deposit', 'withdrawal', 'other', 'new_id'],
     default: 'other',
   },
   priority: {
@@ -45,6 +49,10 @@ const leadSchema = new mongoose.Schema({
   chatId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Chat',
+  },
+  requestedDafaId: {
+    type: String,
+    trim: true,
   },
   internalNotes: [{
     text: String,

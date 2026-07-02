@@ -202,4 +202,78 @@ router.post('/:id/reopen', auth, isAgentOrAbove, async (req, res) => {
   }
 });
 
+router.post('/:id/transfer-self', auth, async (req, res) => {
+  try {
+    const { agentId } = req.body;
+    const chat = await Chat.findById(req.params.id);
+    if (!chat) {
+      return res.status(404).json({ error: 'Chat not found' });
+    }
+
+    const customer = await Customer.findOne({ userId: req.user._id });
+    if (!customer || chat.customerId.toString() !== customer._id.toString()) {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    const User = require('../models/User');
+    const Lead = require('../models/Lead');
+    const Notification = require('../models/Notification');
+
+    const agent = await User.findOne({ _id: agentId, role: 'agent', isActive: true, status: 'online' });
+    if (!agent) {
+      return res.status(400).json({ error: 'Selected agent is not available' });
+    }
+
+    chat.agentId = agent._id;
+    await chat.save();
+
+    customer.assignedAgent = agent._id;
+    customer.leadStatus = 'assigned';
+    await customer.save();
+
+    const lead = await Lead.findOne({ chatId: chat._id });
+    if (lead) {
+      lead.assignedAgent = agent._id;
+      lead.assignedAgents = [agent._id];
+      lead.status = 'assigned';
+      lead.timeline.push({
+        event: `Customer self-transferred chat to ${agent.fullName}`,
+        date: new Date(),
+        by: req.user._id
+      });
+      await lead.save();
+    }
+
+    const io = req.app.get('io');
+    if (io) {
+      io.to(chat._id.toString()).emit('agent_assigned', {
+        agentName: agent.fullName,
+        chatId: chat._id
+      });
+
+      io.emit('new_chat_assigned', {
+        chatId: chat._id,
+        customer: customer.toObject(),
+        issueType: chat.issueType,
+        message: `${customer.fullName} connected to you directly.`
+      });
+
+      const agentNotif = new Notification({
+        userId: agent._id,
+        type: 'agent_assigned',
+        title: 'Chat Selected By Customer',
+        body: `${customer.fullName} selected you to help them`,
+        metadata: { chatId: chat._id, customerId: customer._id },
+      });
+      await agentNotif.save();
+      io.emit('new_notification', agentNotif);
+    }
+
+    res.json({ chat });
+  } catch (error) {
+    console.error('Self transfer error:', error);
+    res.status(500).json({ error: 'Failed to transfer chat' });
+  }
+});
+
 module.exports = router;

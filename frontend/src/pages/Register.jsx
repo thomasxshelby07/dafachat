@@ -193,21 +193,21 @@ const Register = () => {
 
                 <div>
                   <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDarkCard ? 'text-slate-300' : 'text-text-1'}`}>
-                    Dafaxbet ID
+                    {branding.companyName || 'DAFAX Bet'} ID
                   </label>
                   <input
                     type="text"
-                    placeholder="Enter your Dafaxbet ID"
+                    placeholder={`Enter your ${branding.companyName || 'DAFAX Bet'} ID`}
                     className={`w-full border-[1.5px] rounded-xl px-4 py-3 text-base sm:text-sm font-normal min-h-[48px] outline-none transition-all ${
                       isDarkCard 
                         ? 'bg-slate-900/50 border-slate-700/50 text-white placeholder-slate-500 focus:border-primary' 
                         : 'bg-bg border-border text-text-1 placeholder-text-3 focus:border-primary'
                     }`}
                     {...register('dafaxbetId', {
-                      required: 'Dafaxbet ID is required',
+                      required: `${branding.companyName || 'DAFAX Bet'} ID is required`,
                       minLength: {
                         value: 3,
-                        message: 'Dafaxbet ID must be at least 3 characters',
+                        message: `${branding.companyName || 'DAFAX Bet'} ID must be at least 3 characters`,
                       },
                     })}
                   />
@@ -279,7 +279,7 @@ const Register = () => {
                     pattern="[0-9]*"
                     inputMode="numeric"
                     placeholder="xxxx"
-                    autoComplete="new-password"
+                    autoComplete="one-time-code"
                     style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
                     className={`w-full border-[1.5px] text-center rounded-xl px-4 py-3 text-lg font-bold min-h-[48px] tracking-[0.5em] outline-none transition-all ${
                       isDarkCard 
@@ -309,7 +309,7 @@ const Register = () => {
                     pattern="[0-9]*"
                     inputMode="numeric"
                     placeholder="xxxx"
-                    autoComplete="new-password"
+                    autoComplete="one-time-code"
                     style={{ WebkitTextSecurity: 'disc', textSecurity: 'disc' }}
                     className={`w-full border-[1.5px] text-center rounded-xl px-4 py-3 text-lg font-bold min-h-[48px] tracking-[0.5em] outline-none transition-all ${
                       isDarkCard 

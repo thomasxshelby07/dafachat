@@ -6,6 +6,43 @@ const AuditLog = require('../models/AuditLog');
 
 const router = express.Router();
 
+// PATCH /status — Update own status
+router.patch('/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['online', 'away', 'break', 'offline'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status. Must be online, away, break or offline.' });
+    }
+
+    const { updateUserStatus } = require('../utils/activitySystem');
+    const io = req.app.get('io');
+
+    const updatedUser = await updateUserStatus(req.user._id, status, io);
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ user: updatedUser.toJSON() });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update status' });
+  }
+});
+
+// GET /agents/online — Get list of online agents
+router.get('/agents/online', auth, async (req, res) => {
+  try {
+    const agents = await User.find({
+      role: 'agent',
+      isActive: true,
+      status: 'online'
+    }).select('fullName avatar permissions.issueTypes');
+    
+    res.json({ agents });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch online agents' });
+  }
+});
+
 // Manager + Super Admin can see agents
 router.get('/agents', auth, isManagerOrAbove, async (req, res) => {
   try {
@@ -18,6 +55,80 @@ router.get('/agents', auth, isManagerOrAbove, async (req, res) => {
     res.json({ agents });
   } catch (error) {
     res.status(500).json({ error: 'Failed to fetch agents' });
+  }
+});
+
+// GET /agents/activity (Manager Live Panel)
+router.get('/agents/activity', auth, isManagerOrAbove, async (req, res) => {
+  try {
+    const agents = await User.find({ role: 'agent' }).select('-passwordHash');
+    const Lead = require('../models/Lead');
+    const Chat = require('../models/Chat');
+
+    const activityData = await Promise.all(
+      agents.map(async (agent) => {
+        const activeLeads = await Lead.find({
+          assignedAgent: agent._id,
+          status: { $in: ['assigned', 'in_progress', 'follow_up', 'interested'] }
+        }).select('chatId');
+
+        const Message = require('../models/Message');
+        let assignedLeadsCount = 0;
+        for (const lead of activeLeads) {
+          if (lead.chatId) {
+            const hasUnread = await Message.exists({
+              chatId: lead.chatId,
+              senderRole: 'customer',
+              status: { $ne: 'read' }
+            });
+            if (hasUnread) {
+              assignedLeadsCount++;
+            }
+          }
+        }
+
+        const startOfDay = new Date();
+        startOfDay.setHours(0, 0, 0, 0);
+
+        const resolvedTodayCount = await Lead.countDocuments({
+          assignedAgent: agent._id,
+          status: { $in: ['closed', 'converted', 'issue_solved'] },
+          updatedAt: { $gte: startOfDay }
+        });
+
+        return {
+          ...agent.toObject(),
+          assignedLeadsCount,
+          resolvedTodayCount
+        };
+      })
+    );
+
+    res.json({ agents: activityData });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agents activity' });
+  }
+});
+
+// Force status override by Manager
+router.patch('/:id/status/force', auth, isManagerOrAbove, async (req, res) => {
+  try {
+    const { status } = req.body;
+    if (!['online', 'break', 'offline'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid forced status. Must be online, break or offline.' });
+    }
+
+    const { updateUserStatus } = require('../utils/activitySystem');
+    const io = req.app.get('io');
+
+    const updatedUser = await updateUserStatus(req.params.id, status, io);
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'Agent not found' });
+    }
+
+    res.json({ user: updatedUser.toJSON() });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to force update status' });
   }
 });
 
@@ -226,9 +337,16 @@ router.patch('/:id', auth, isManagerOrAbove, async (req, res) => {
     if (mobile) user.mobile = mobile;
     if (email) user.email = email.toLowerCase();
     if (typeof isActive === 'boolean') user.isActive = isActive;
-    if (status && ['online', 'away', 'break'].includes(status)) user.status = status;
     if (role && ['agent', 'manager'].includes(role)) user.role = role;
     if (req.body.avatar !== undefined) user.avatar = req.body.avatar;
+    if (req.body.team !== undefined) user.team = req.body.team;
+    if (req.body.department !== undefined) user.department = req.body.department;
+
+    if (status && ['online', 'away', 'break', 'offline'].includes(status)) {
+      const { updateUserStatus } = require('../utils/activitySystem');
+      const io = req.app.get('io');
+      await updateUserStatus(user._id, status, io);
+    }
 
     await user.save();
 
@@ -265,6 +383,8 @@ router.patch('/:id/permissions', auth, isManagerOrAbove, async (req, res) => {
     if (permissions) {
       const currentPerms = user.permissions?.toObject?.() || {};
       user.permissions = { ...currentPerms, ...permissions };
+      if (permissions.team !== undefined) user.team = permissions.team;
+      if (permissions.department !== undefined) user.department = permissions.department;
       user.markModified('permissions');
       await user.save();
     }
@@ -275,39 +395,64 @@ router.patch('/:id/permissions', auth, isManagerOrAbove, async (req, res) => {
   }
 });
 
-// Delete/deactivate — Super Admin can remove anyone, Manager can remove agents
-router.delete('/:id', auth, isManagerOrAbove, async (req, res) => {
+// DELETE /:id — Delete a user (and all associated data if customer)
+router.delete('/:id', auth, isAdmin, async (req, res) => {
   try {
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
+    const targetUser = await User.findById(req.params.id);
+    if (!targetUser) {
       return res.status(404).json({ error: 'User not found' });
     }
 
-    if (user.role === 'super_admin') {
-      return res.status(403).json({ error: 'Cannot deactivate super admin' });
+    if (targetUser.role === 'super_admin') {
+      return res.status(403).json({ error: 'Cannot delete super admin' });
     }
 
-    if (req.user.role === 'manager' && user.role !== 'agent') {
-      return res.status(403).json({ error: 'Managers can only deactivate agents' });
+    const Customer = require('../models/Customer');
+    const Chat = require('../models/Chat');
+    const Lead = require('../models/Lead');
+    const Message = require('../models/Message');
+
+    // If it's a customer, clean up all associated data
+    if (targetUser.role === 'customer') {
+      const customer = await Customer.findOne({ userId: targetUser._id });
+      if (customer) {
+        const chats = await Chat.find({ customerId: customer._id });
+        const chatIds = chats.map(c => c._id);
+
+        // Delete messages in customer chats
+        await Message.deleteMany({ chatId: { $in: chatIds } });
+
+        // Delete chats
+        await Chat.deleteMany({ customerId: customer._id });
+
+        // Delete leads
+        await Lead.deleteMany({ customerId: customer._id });
+
+        // Delete customer record
+        await Customer.deleteOne({ _id: customer._id });
+      }
+    } else if (targetUser.role === 'agent' || targetUser.role === 'manager') {
+      // Unassign this agent/manager from chats and leads
+      await Chat.updateMany({ agentId: targetUser._id }, { $unset: { agentId: "" } });
+      await Lead.updateMany({ assignedAgent: targetUser._id }, { $unset: { assignedAgent: "" }, $pull: { assignedAgents: targetUser._id } });
+      await Customer.updateMany({ assignedAgent: targetUser._id }, { $unset: { assignedAgent: "" } });
     }
 
-    user.isActive = false;
-    await user.save();
+    await User.deleteOne({ _id: targetUser._id });
 
     await AuditLog.create({
       userId: req.user._id,
-      action: 'deactivate_user',
+      action: 'delete_user',
       entity: 'user',
-      entityId: user._id,
-      before: { isActive: true },
-      after: { isActive: false },
+      entityId: targetUser._id,
+      before: targetUser.toObject(),
       ip: req.ip,
     });
 
-    res.json({ message: 'User deactivated' });
+    res.json({ message: 'User deleted successfully' });
   } catch (error) {
-    res.status(500).json({ error: 'Failed to deactivate user' });
+    console.error('Delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete user' });
   }
 });
 

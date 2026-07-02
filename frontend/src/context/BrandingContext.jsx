@@ -15,13 +15,13 @@ const getApiUrl = () => {
 
 export const BrandingProvider = ({ children }) => {
   const [branding, setBranding] = useState({
-    companyName: 'DAFAX Bet',
+    companyName: 'DAFA Bet',
     logo: '',
     favicon: '',
     primaryColor: '#B91C1C',
     secondaryColor: '#991B1B',
     headerBg: '#111827',
-    footerText: '© 2026 DAFAX Bet. All rights reserved.',
+    footerText: '© 2026 DAFA Bet. All rights reserved.',
     playNowBgColor: '#B91C1C',
     playNowTextColor: '#FFFFFF',
     authLinkColor: '#B91C1C',
@@ -30,11 +30,18 @@ export const BrandingProvider = ({ children }) => {
   });
 
   const [homepage, setHomepage] = useState({
-    welcomeText: 'Welcome to DAFAX Support',
+    welcomeText: 'Welcome to DAFA Support',
     supportHeader: 'How can we help you?',
     playNowLabel: 'Play Now',
     playNowUrl: '#',
+    autoIdLink: '#',
     helpText: 'Our support team is available 24/7 to assist you.',
+    faqs: [
+      { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },
+      { q: 'How long does a withdrawal take?', a: 'Withdrawals are processed within 15-30 minutes. If there is a delay, please contact support by opening a "Withdrawal Issue" chat.' },
+      { q: 'How do I verify my account?', a: 'Upload a clear copy of your Identity document in your profile settings or share it directly with our support agent in chat.' },
+      { q: 'Is my personal data secure?', a: 'Yes, we use global bank-grade encryption to protect all your account data.' },
+    ],
   });
 
   const [loading, setLoading] = useState(true);

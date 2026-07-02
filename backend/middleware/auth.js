@@ -19,6 +19,12 @@ const auth = async (req, res, next) => {
     req.user = user;
     req.userId = user._id;
     req.userRole = user.role;
+
+    if (user.role !== 'customer') {
+      const now = new Date();
+      User.findByIdAndUpdate(user._id, { lastActivityAt: now }).catch(e => {});
+    }
+
     next();
   } catch (error) {
     if (error.name === 'TokenExpiredError') {

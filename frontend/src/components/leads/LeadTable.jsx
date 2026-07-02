@@ -261,8 +261,21 @@ const LeadTable = ({ onSelectLead }) => {
                         <div>
                           <p className="text-sm font-medium text-text-1">{lead.customerId?.fullName}</p>
                           <p className="text-[11px] text-text-3">{lead.customerId?.customerId}</p>
-                          {lead.customerId?.dafaxbetId && (
-                            <p className="text-[10px] text-primary font-semibold">Dafaxbet ID: {lead.customerId.dafaxbetId}</p>
+                          {lead.customerId?.dafaxbetId ? (
+                            <div className="flex flex-col gap-0.5 mt-0.5">
+                              <p className="text-[10px] text-primary font-semibold">Dafaxbet ID: {lead.customerId.dafaxbetId}</p>
+                              <div>
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                  Client
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="mt-1">
+                              <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                                No Customer (New Lead)
+                              </span>
+                            </div>
                           )}
                         </div>
                       </div>

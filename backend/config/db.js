@@ -20,11 +20,13 @@ const connectDB = async () => {
 };
 
 const connectRedis = () => {
+  if (process.env.DISABLE_REDIS === 'true') {
+    logger.info('Redis connection disabled by configuration');
+    redisAvailable = false;
+    return null;
+  }
   try {
-    redis = new Redis({
-      host: process.env.REDIS_HOST || 'localhost',
-      port: process.env.REDIS_PORT || 6379,
-      password: process.env.REDIS_PASSWORD || undefined,
+    const redisOptions = {
       maxRetriesPerRequest: 1,
       retryStrategy: (times) => {
         if (times > 3) {
@@ -34,7 +36,18 @@ const connectRedis = () => {
         return Math.min(times * 200, 2000);
       },
       enableOfflineQueue: false,
-    });
+    };
+
+    if (process.env.REDIS_URL) {
+      redis = new Redis(process.env.REDIS_URL, redisOptions);
+    } else {
+      redis = new Redis({
+        host: process.env.REDIS_HOST || 'localhost',
+        port: process.env.REDIS_PORT || 6379,
+        password: process.env.REDIS_PASSWORD || undefined,
+        ...redisOptions,
+      });
+    }
 
     redis.on('connect', () => {
       redisAvailable = true;
@@ -45,8 +58,9 @@ const connectRedis = () => {
       redisAvailable = true;
     });
 
-    redis.on('error', () => {
+    redis.on('error', (err) => {
       redisAvailable = false;
+      logger.error('Redis connection error:', err);
     });
 
     redis.on('close', () => {

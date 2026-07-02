@@ -289,11 +289,11 @@ const Login = () => {
                   <div className="space-y-4">
                     <div>
                       <label className={`block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDarkCard ? 'text-slate-300' : 'text-text-1'}`}>
-                        Dafaxbet ID
+                        {branding.companyName || 'DAFAX Bet'} ID
                       </label>
                       <input
                         type="text"
-                        placeholder="Enter your Dafaxbet ID"
+                        placeholder={`Enter your ${branding.companyName || 'DAFAX Bet'} ID`}
                         value={forgotDafaxbetId}
                         onChange={(e) => setForgotDafaxbetId(e.target.value)}
                         className={`w-full border-[1.5px] rounded-xl px-4 py-3 text-base sm:text-sm font-normal min-h-[48px] outline-none transition-all ${

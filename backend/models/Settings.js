@@ -13,7 +13,7 @@ const settingsSchema = new mongoose.Schema({
   },
   group: {
     type: String,
-    enum: ['branding', 'homepage', 'system', 'notifications'],
+    enum: ['branding', 'homepage', 'system', 'notifications', 'agentActivity'],
     required: true,
   },
   updatedBy: {

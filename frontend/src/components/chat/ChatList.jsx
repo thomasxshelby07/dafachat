@@ -1,4 +1,8 @@
+import { useBranding } from '../../context/BrandingContext';
+
 const ChatList = ({ chats, activeChatId, onSelectChat, user }) => {
+  const { branding } = useBranding();
+
   const formatTime = (date) => {
     if (!date) return '';
     const d = new Date(date);
@@ -30,7 +34,7 @@ const ChatList = ({ chats, activeChatId, onSelectChat, user }) => {
   };
 
   const getDisplayName = (chat, isCustomerView) => {
-    if (isCustomerView) return 'DAFAXBET SUPPORT';
+    if (isCustomerView) return branding.companyName ? `${branding.companyName.toUpperCase()} SUPPORT` : 'SUPPORT';
     return chat.customerId?.fullName || 'Unknown';
   };
 

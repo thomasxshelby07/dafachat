@@ -8,7 +8,7 @@ const logger = winston.createLogger({
     winston.format.errors({ stack: true }),
     winston.format.json()
   ),
-  defaultMeta: { service: 'dafax-bet-support' },
+  defaultMeta: { service: 'dafa-support' },
   transports: [
     new winston.transports.File({
       filename: path.join(__dirname, '../logs/error.log'),

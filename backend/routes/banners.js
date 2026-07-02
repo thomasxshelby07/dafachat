@@ -6,6 +6,15 @@ const AuditLog = require('../models/AuditLog');
 
 const router = express.Router();
 
+router.get('/public', async (req, res) => {
+  try {
+    const banners = await Banner.find({ isActive: true }).sort({ order: 1 });
+    res.json({ banners });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch public banners' });
+  }
+});
+
 router.get('/', auth, async (req, res) => {
   try {
     const { includeInactive } = req.query;

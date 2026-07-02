@@ -1,6 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
-const { isAgentOrAbove, isManagerOrAbove } = require('../middleware/roleCheck');
+const { isAgentOrAbove, isManagerOrAbove, isAdmin } = require('../middleware/roleCheck');
 const Lead = require('../models/Lead');
 const Customer = require('../models/Customer');
 const User = require('../models/User');
@@ -29,11 +29,17 @@ const getSocketId = async (app, userId) => {
 
 router.get('/', auth, isAgentOrAbove, async (req, res) => {
   try {
-    const { page = 1, limit = 20, status, agent, search, startDate, endDate, tag } = req.query;
+    const { page = 1, limit = 20, status, agent, search, startDate, endDate, tag, customerId } = req.query;
     const query = {};
 
+    if (customerId) {
+      query.customerId = customerId;
+    }
+
     if (req.user.role === 'agent') {
-      query.assignedAgent = req.user._id;
+      if (!customerId) {
+        query.assignedAgent = req.user._id;
+      }
     } else if (agent) {
       query.assignedAgent = agent;
     }
@@ -539,6 +545,214 @@ router.delete('/:id/tags/:tag', auth, isAgentOrAbove, async (req, res) => {
     res.json({ lead });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete tag' });
+  }
+});
+
+// DELETE /:id — Delete a lead and all associated customer data
+router.delete('/:id', auth, isAdmin, async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const customerId = lead.customerId;
+    const customer = await Customer.findById(customerId);
+    if (customer) {
+      // Delete user
+      if (customer.userId) {
+        await User.deleteOne({ _id: customer.userId });
+      }
+
+      // Delete chats and messages
+      const Message = require('../models/Message');
+      const chats = await Chat.find({ customerId: customer._id });
+      const chatIds = chats.map(c => c._id);
+      await Message.deleteMany({ chatId: { $in: chatIds } });
+      await Chat.deleteMany({ customerId: customer._id });
+
+      // Delete customer
+      await Customer.deleteOne({ _id: customer._id });
+    }
+
+    // Delete lead
+    await Lead.deleteOne({ _id: lead._id });
+
+    // Create Audit Log
+    const AuditLog = require('../models/AuditLog');
+    await AuditLog.create({
+      userId: req.user._id,
+      action: 'delete_lead',
+      entity: 'lead',
+      entityId: lead._id,
+      before: lead.toObject(),
+      ip: req.ip,
+    });
+
+    res.json({ message: 'Lead and associated customer data deleted successfully' });
+  } catch (error) {
+    console.error('Lead delete error:', error);
+    res.status(500).json({ error: 'Failed to delete lead' });
+  }
+});
+
+// POST /:id/upgrade-client — Upgrade a lead to client by assigning a Dafa ID
+router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
+  try {
+    const { dafaxbetId } = req.body;
+    if (!dafaxbetId || !dafaxbetId.trim()) {
+      return res.status(400).json({ error: 'Dafa ID is required' });
+    }
+
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const customer = await Customer.findById(lead.customerId);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // Check if Dafa ID is already taken
+    const existingCustomer = await Customer.findOne({
+      dafaxbetId: { $regex: new RegExp('^' + dafaxbetId.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+    });
+    if (existingCustomer) {
+      return res.status(409).json({ error: 'This Dafa ID is already registered' });
+    }
+
+    // Update Customer
+    customer.dafaxbetId = dafaxbetId.trim();
+    await customer.save();
+
+    // Update User
+    if (customer.userId) {
+      await User.findByIdAndUpdate(customer.userId, { fullName: dafaxbetId.trim() });
+    }
+
+    // Update Lead status
+    lead.status = 'converted';
+    lead.requestedDafaId = undefined;
+    lead.timeline.push({
+      event: `Lead upgraded to Client with Dafa ID: ${dafaxbetId.trim()}`,
+      date: new Date(),
+      by: req.user._id,
+    });
+    await lead.save();
+
+    // Send automatic message in the chat
+    if (lead.chatId) {
+      const Message = require('../models/Message');
+      const systemMsg = new Message({
+        chatId: lead.chatId,
+        senderId: req.user._id,
+        senderRole: 'agent',
+        content: `🎉 Congratulations! Your player ID has been created successfully.\n\nDafa ID: ${dafaxbetId.trim()}\n\n[Login to Customer Care](/login)`,
+        type: 'text'
+      });
+      await systemMsg.save();
+
+      // Emit to socket
+      const io = req.app.get('io');
+      if (io) {
+        io.to(lead.chatId.toString()).emit('message', systemMsg);
+        io.to(lead.chatId.toString()).emit('lead_upgraded', { dafaxbetId: dafaxbetId.trim() });
+      }
+    }
+
+    res.json({ message: 'Lead upgraded to client successfully', dafaxbetId: dafaxbetId.trim() });
+  } catch (error) {
+    console.error('Lead upgrade error:', error);
+    res.status(500).json({ error: 'Failed to upgrade lead' });
+  }
+});
+
+// POST /request-link — Submit a request to link an existing Dafa ID (Requires verification by agent)
+router.post('/request-link', auth, async (req, res) => {
+  try {
+    const { dafaxbetId } = req.body;
+    if (!dafaxbetId || !dafaxbetId.trim()) {
+      return res.status(400).json({ error: 'Dafa ID is required' });
+    }
+
+    const customer = await Customer.findOne({ userId: req.user._id });
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer profile not found' });
+    }
+
+    if (customer.dafaxbetId && customer.dafaxbetId.trim() !== '') {
+      return res.status(400).json({ error: 'Your account is already linked to a Dafa ID' });
+    }
+
+    // Check if this Dafa ID is already taken by another customer profile
+    const existingCustomer = await Customer.findOne({
+      dafaxbetId: { $regex: new RegExp('^' + dafaxbetId.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+    });
+    if (existingCustomer) {
+      return res.status(409).json({ error: 'This Dafa ID is already registered' });
+    }
+
+    // Find or create a lead associated with this customer
+    let lead = await Lead.findOne({ customerId: customer._id });
+    if (!lead) {
+      lead = new Lead({
+        customerId: customer._id,
+        status: 'new',
+        issueType: 'new_id',
+      });
+    }
+
+    // Set the requested ID and status
+    lead.requestedDafaId = dafaxbetId.trim();
+    lead.status = 'follow_up'; // Mark it as follow_up to flag for agent review
+    lead.timeline.push({
+      event: `Customer requested to link Dafa ID: ${dafaxbetId.trim()}`,
+      date: new Date(),
+      by: req.user._id,
+    });
+    await lead.save();
+
+    // Check if chat room exists, if not create one
+    let chatId = lead.chatId;
+    if (!chatId) {
+      const Chat = require('../models/Chat');
+      let chat = await Chat.findOne({ customerId: customer._id, status: 'active' });
+      if (!chat) {
+        chat = new Chat({
+          customerId: customer._id,
+          status: 'active',
+          issueType: 'new_id',
+        });
+        await chat.save();
+      }
+      chatId = chat._id;
+      lead.chatId = chatId;
+      await lead.save();
+    }
+
+    // Send automatic request message in the chat
+    const Message = require('../models/Message');
+    const systemMsg = new Message({
+      chatId: chatId,
+      senderId: req.user._id,
+      senderRole: 'customer',
+      content: `🔑 **Dafa ID Verification Request**:\nSir, I have requested to link my existing Dafa ID: **${dafaxbetId.trim()}**. Please verify and link my account.\n\nसर, मैंने अपनी मौजूदा दाफा आईडी: **${dafaxbetId.trim()}** को लिंक करने का अनुरोध किया है। कृपया जांचें और लिंक करें।`,
+      type: 'text'
+    });
+    await systemMsg.save();
+
+    // Emit message to room
+    const io = req.app.get('io');
+    if (io) {
+      io.to(chatId.toString()).emit('message', systemMsg);
+      io.to(chatId.toString()).emit('lead_updated', { lead });
+    }
+
+    res.json({ message: 'Request submitted successfully', requestedDafaId: dafaxbetId.trim(), chatId });
+  } catch (error) {
+    console.error('Request Dafa ID link error:', error);
+    res.status(500).json({ error: 'Failed to submit verification request' });
   }
 });
 

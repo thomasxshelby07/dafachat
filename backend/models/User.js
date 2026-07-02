@@ -24,7 +24,6 @@ const userSchema = new mongoose.Schema({
   },
   passwordHash: {
     type: String,
-    required: [true, 'Password is required'],
   },
   securityPinHash: {
     type: String,
@@ -44,8 +43,34 @@ const userSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['online', 'away', 'break'],
+    enum: ['online', 'away', 'break', 'offline'],
     default: 'online',
+  },
+  team: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  department: {
+    type: String,
+    default: '',
+    trim: true,
+  },
+  todayActiveTime: {
+    type: Number,
+    default: 0,
+  },
+  todayBreakTime: {
+    type: Number,
+    default: 0,
+  },
+  statusChangedAt: {
+    type: Date,
+    default: Date.now,
+  },
+  lastActivityAt: {
+    type: Date,
+    default: Date.now,
   },
   permissions: {
     canSeeLeads: { type: Boolean, default: true },
@@ -57,7 +82,7 @@ const userSchema = new mongoose.Schema({
     canManageBranding: { type: Boolean, default: false },
     issueTypes: [{
       type: String,
-      enum: ['deposit', 'withdrawal', 'other'],
+      enum: ['deposit', 'withdrawal', 'other', 'new_id'],
     }],
   },
   avatar: {

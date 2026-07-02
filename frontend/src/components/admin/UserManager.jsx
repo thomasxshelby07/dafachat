@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import api from '../../hooks/api';
+import { useAuth } from '../../context/AuthContext';
 
 const ISSUE_TYPES = [
   { key: 'deposit', label: 'Deposit Issues' },
   { key: 'withdrawal', label: 'Withdrawal Issues' },
+  { key: 'new_id', label: 'New ID Issues' },
   { key: 'other', label: 'General Issues' },
 ];
 
 const UserManager = ({ initialFilter = '' }) => {
+  const { user } = useAuth();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -103,6 +106,8 @@ const UserManager = ({ initialFilter = '' }) => {
       canManageBranding: user.permissions?.canManageBranding ?? false,
       issueTypes: user.permissions?.issueTypes || [],
       avatar: user.avatar || '',
+      team: user.team || '',
+      department: user.department || '',
     });
   };
 
@@ -308,9 +313,11 @@ const UserManager = ({ initialFilter = '' }) => {
                       <button onClick={() => handleToggleActive(u)} className={`px-2 py-1 rounded text-xs font-medium ${u.isActive ? 'bg-success/10 text-success' : 'bg-danger/10 text-danger'}`}>
                         {u.isActive ? 'Active' : 'Inactive'}
                       </button>
-                      <button onClick={() => handleDelete(u)} className="px-2 py-1 rounded text-xs font-medium bg-danger/10 text-danger hover:bg-danger/20">
-                        Delete
-                      </button>
+                      {user?.role === 'super_admin' && (
+                        <button onClick={() => handleDelete(u)} className="px-2 py-1 rounded text-xs font-medium bg-danger/10 text-danger hover:bg-danger/20">
+                          Delete
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -377,6 +384,28 @@ const UserManager = ({ initialFilter = '' }) => {
                         <span className="text-xs text-text-2">{label}</span>
                       </label>
                     ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 mt-2 pt-2 border-t border-border/50">
+                    <div>
+                      <label className="block text-[10px] font-semibold text-text-2 mb-1">Team</label>
+                      <input
+                        type="text"
+                        value={permForm.team || ''}
+                        onChange={(e) => setPermForm(prev => ({ ...prev, team: e.target.value }))}
+                        placeholder="e.g. Alpha"
+                        className="w-full px-2 py-1 bg-surface border border-border rounded text-xs text-text-1 focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[10px] font-semibold text-text-2 mb-1">Department</label>
+                      <input
+                        type="text"
+                        value={permForm.department || ''}
+                        onChange={(e) => setPermForm(prev => ({ ...prev, department: e.target.value }))}
+                        placeholder="e.g. VIP Care"
+                        className="w-full px-2 py-1 bg-surface border border-border rounded text-xs text-text-1 focus:outline-none focus:border-primary"
+                      />
+                    </div>
                   </div>
                   <div>
                     <p className="text-xs font-medium text-text-2 mb-1.5">Handle Issue Types</p>

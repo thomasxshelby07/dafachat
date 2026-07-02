@@ -48,6 +48,15 @@ export const AuthProvider = ({ children }) => {
     return user;
   };
 
+  const smartLogin = async (mobile, dafaxbetId, flow) => {
+    const response = await api.post('/api/auth/smart-login', { mobile, dafaxbetId, flow });
+    const { user, accessToken } = response.data;
+    localStorage.setItem('accessToken', accessToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+    setUser(user);
+    return response.data; // includes isNewUser, message
+  };
+
   const adminLogin = async (email, password) => {
     const response = await api.post('/api/auth/admin-login', { email, password });
     const { user, accessToken } = response.data;
@@ -79,6 +88,7 @@ export const AuthProvider = ({ children }) => {
     login,
     adminLogin,
     register,
+    smartLogin,
     logout,
     updateUser,
     isAuthenticated: !!user,

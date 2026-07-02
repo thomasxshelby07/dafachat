@@ -45,6 +45,20 @@ const customerSchema = new mongoose.Schema({
     type: String,
     trim: true,
   }],
+  country: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  leadSource: {
+    type: String,
+    trim: true,
+    default: '',
+  },
+  isVIP: {
+    type: Boolean,
+    default: false,
+  },
   notes: [{
     type: String,
     trim: true,
