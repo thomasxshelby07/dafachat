@@ -306,8 +306,8 @@ const CustomerDashboard = () => {
 
   if (activeChat) {
     return (
-      <div className="h-screen bg-bg flex justify-center" style={brandingStyles}>
-        <div className="w-full max-w-lg h-full bg-surface border-x border-border flex flex-col shadow-float">
+      <div className="fixed inset-0 bg-bg flex justify-center" style={brandingStyles}>
+        <div className="w-full max-w-lg h-full bg-surface border-x border-border flex flex-col shadow-float overflow-hidden">
           <ChatScreen 
             chatId={activeChat._id} 
             onBack={() => {
