@@ -195,8 +195,34 @@ const CustomerDashboard = () => {
     };
     const handleAnnouncementsChanged = () => loadBannersAndAnnouncements();
     const handleNewBroadcast = () => loadBroadcasts();
-    const handleLeadUpgraded = (data) => {
+    const handleLeadUpgraded = async (data) => {
       setUpgradedDafaId(data.dafaxbetId);
+      // Auto-login: use the mobile from the event (or fallback to current user's mobile)
+      const mobile = data.mobile || user?.mobile;
+      if (mobile && data.dafaxbetId) {
+        try {
+          // Small delay so customer sees the congrats message in chat first
+          setTimeout(async () => {
+            try {
+              // Login as existing customer with the new Dafa ID
+              await api.post('/api/auth/smart-login', {
+                mobile: mobile,
+                dafaxbetId: data.dafaxbetId,
+                flow: 'existing',
+              }).then(res => {
+                const { user: newUser, accessToken } = res.data;
+                localStorage.setItem('accessToken', accessToken);
+                localStorage.removeItem('leadSession');
+                // Hard redirect to customer care dashboard
+                window.location.href = '/';
+              });
+            } catch (e) {
+              // Fallback: just show upgrade screen, let them login manually
+              console.warn('Auto-login failed, showing manual redirect:', e);
+            }
+          }, 3000);
+        } catch (e) {}
+      }
     };
 
     on('chat_joined', handleChatJoined);

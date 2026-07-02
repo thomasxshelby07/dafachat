@@ -680,7 +680,10 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
       const io = req.app.get('io');
       if (io) {
         io.to(lead.chatId.toString()).emit('message', systemMsg);
-        io.to(lead.chatId.toString()).emit('lead_upgraded', { dafaxbetId: dafaxbetId.trim() });
+        io.to(lead.chatId.toString()).emit('lead_upgraded', {
+          dafaxbetId: dafaxbetId.trim(),
+          mobile: customer.mobile,
+        });
       }
     }
 
