@@ -3,6 +3,10 @@ import { io } from 'socket.io-client';
 import { useAuth } from '../context/AuthContext';
 
 const getSocketUrl = () => {
+  // In production (Vercel), use the Railway backend HTTPS URL
+  if (import.meta.env.VITE_API_URL) {
+    return import.meta.env.VITE_API_URL;
+  }
   const host = window.location.hostname;
   return `http://${host}:5000`;
 };
