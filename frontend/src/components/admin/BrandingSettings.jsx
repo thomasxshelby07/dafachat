@@ -12,6 +12,7 @@ const BrandingSettings = () => {
     playNowLabel: 'Play Now',
     playNowUrl: '',
     autoIdLink: '',
+    siteLoginLink: '',
     playNowBgColor: '#635BFF',
     playNowTextColor: '#FFFFFF',
     authBgType: 'gradient',
@@ -240,6 +241,17 @@ const BrandingSettings = () => {
                   value={settings.autoIdLink}
                   onChange={(e) => handleChange('autoIdLink', e.target.value)}
                   placeholder="https://..."
+                  className="input-field"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-text-1 mb-1.5">🎮 Site Login Link <span className="text-xs text-text-3 font-normal ml-1">(Game site login URL — sent to customer after ID creation)</span></label>
+                <input
+                  type="url"
+                  value={settings.siteLoginLink}
+                  onChange={(e) => handleChange('siteLoginLink', e.target.value)}
+                  placeholder="https://dafaxbet.com/login"
                   className="input-field"
                 />
               </div>

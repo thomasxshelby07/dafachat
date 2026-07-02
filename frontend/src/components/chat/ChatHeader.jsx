@@ -189,8 +189,14 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
     const dafaId = window.prompt(promptMsg, defaultVal);
     if (!dafaId || !dafaId.trim()) return;
 
+    const password = window.prompt(`Enter game site password for ${dafaId.trim()} (leave blank to skip):`);
+    // password can be empty — it's optional
+
     try {
-      await api.post(`/api/leads/${lead._id}/upgrade-client`, { dafaxbetId: dafaId.trim() });
+      await api.post(`/api/leads/${lead._id}/upgrade-client`, {
+        dafaxbetId: dafaId.trim(),
+        password: password ? password.trim() : '',
+      });
       alert("Lead upgraded to Client successfully!");
       window.location.reload();
     } catch (error) {

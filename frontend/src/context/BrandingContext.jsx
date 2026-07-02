@@ -35,6 +35,7 @@ export const BrandingProvider = ({ children }) => {
     playNowLabel: 'Play Now',
     playNowUrl: '#',
     autoIdLink: '#',
+    siteLoginLink: '#',
     helpText: 'Our support team is available 24/7 to assist you.',
     faqs: [
       { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },

@@ -599,7 +599,7 @@ router.delete('/:id', auth, isAdmin, async (req, res) => {
 // POST /:id/upgrade-client — Upgrade a lead to client by assigning a Dafa ID
 router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
   try {
-    const { dafaxbetId } = req.body;
+    const { dafaxbetId, password } = req.body;
     if (!dafaxbetId || !dafaxbetId.trim()) {
       return res.status(400).json({ error: 'Dafa ID is required' });
     }
@@ -644,11 +644,34 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
     // Send automatic message in the chat
     if (lead.chatId) {
       const Message = require('../models/Message');
+      const Settings = require('../models/Settings');
+
+      // Fetch siteLoginLink from settings
+      let siteLoginLink = null;
+      try {
+        const siteLinkSetting = await Settings.findOne({ group: 'homepage', key: 'siteLoginLink' });
+        if (siteLinkSetting && siteLinkSetting.value && siteLinkSetting.value !== '#') {
+          siteLoginLink = siteLinkSetting.value;
+        }
+      } catch (e) {}
+
+      // Build the chat message
+      let msgContent = `🎉 Congratulations! Your player ID has been created successfully.\n\n`;
+      msgContent += `🔑 **Dafa ID:** ${dafaxbetId.trim()}\n`;
+      if (password && password.trim()) {
+        msgContent += `🔒 **Password:** ${password.trim()}\n`;
+      }
+      msgContent += `\n`;
+      if (siteLoginLink) {
+        msgContent += `[🎮 Login to Game Site](${siteLoginLink})\n`;
+      }
+      msgContent += `[💬 Login to Customer Care](/login)`;
+
       const systemMsg = new Message({
         chatId: lead.chatId,
         senderId: req.user._id,
         senderRole: 'agent',
-        content: `🎉 Congratulations! Your player ID has been created successfully.\n\nDafa ID: ${dafaxbetId.trim()}\n\n[Login to Customer Care](/login)`,
+        content: msgContent,
         type: 'text'
       });
       await systemMsg.save();
