@@ -12,14 +12,14 @@ const router = express.Router();
 const generateTokens = (userId) => {
   const accessToken = jwt.sign(
     { userId },
-    process.env.JWT_ACCESS_SECRET,
-    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '15m' }
+    process.env.JWT_ACCESS_SECRET || 'dafax_access_secret_key_2024_change_in_production',
+    { expiresIn: process.env.JWT_ACCESS_EXPIRY || '90d' }
   );
 
   const refreshToken = jwt.sign(
     { userId },
-    process.env.JWT_REFRESH_SECRET,
-    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '7d' }
+    process.env.JWT_REFRESH_SECRET || 'dafax_refresh_secret_key_2024_change_in_production',
+    { expiresIn: process.env.JWT_REFRESH_EXPIRY || '365d' }
   );
 
   return { accessToken, refreshToken };
@@ -194,7 +194,7 @@ router.post('/refresh', async (req, res) => {
       return res.status(401).json({ error: 'Refresh token required' });
     }
 
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET);
+    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET || 'dafax_refresh_secret_key_2024_change_in_production');
     const user = await User.findById(decoded.userId).select('-passwordHash');
 
     if (!user || !user.isActive) {

@@ -33,7 +33,6 @@ const io = new Server(server, {
   transports: ['polling', 'websocket'],
   allowUpgrades: true,
   perMessageDeflate: false,
-  allowEIO3: true,
 });
 
 const redis = connectRedis();
@@ -49,15 +48,8 @@ const safeRedis = {
 };
 
 const allowedOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
-// Support multiple origins: comma-separated list or wildcard
-const getAllowedOrigins = () => {
-  const raw = allowedOrigin;
-  if (raw === '*') return '*';
-  const origins = raw.split(',').map(o => o.trim()).filter(Boolean);
-  return origins.length === 1 ? origins[0] : origins;
-};
 app.use(cors({
-  origin: getAllowedOrigins(),
+  origin: allowedOrigin,
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
@@ -305,7 +297,7 @@ io.use(async (socket, next) => {
       return next(new Error('Authentication required'));
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'dafax_access_secret_key_2024_change_in_production');
     const user = await User.findById(decoded.userId).select('-passwordHash');
 
     if (!user || !user.isActive) {

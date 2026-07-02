@@ -9,7 +9,7 @@ const auth = async (req, res, next) => {
       return res.status(401).json({ error: 'Authentication required' });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET);
+    const decoded = jwt.verify(token, process.env.JWT_ACCESS_SECRET || 'dafax_access_secret_key_2024_change_in_production');
     const user = await User.findById(decoded.userId).select('-passwordHash');
 
     if (!user || !user.isActive) {
