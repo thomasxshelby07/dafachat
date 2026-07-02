@@ -5,7 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
 import api from '../hooks/api';
 
-const MODE = { REGISTER: 'register', LOGIN: 'login' };
+const MODE = { REGISTER: 'register', LOGIN: 'login', EXISTING: 'existing' };
 
 const RegisterLead = () => {
   const { login, register } = useAuth();
@@ -15,6 +15,7 @@ const RegisterLead = () => {
   const [mode, setMode] = useState(MODE.REGISTER);
   const [fullName, setFullName] = useState('');
   const [mobile, setMobile] = useState('');
+  const [dafaId, setDafaId] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -149,6 +150,60 @@ const RegisterLead = () => {
     }
   };
 
+  // Handler for "I Already Have a Dafa ID" flow
+  const handleExistingId = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const trimDafaId = dafaId.trim();
+    const trimMobile = mobile.trim();
+
+    if (!trimDafaId) { setError('Please enter your Dafa ID.'); return; }
+    if (!trimMobile || trimMobile.length < 10) { setError('Please enter a valid 10-digit mobile number.'); return; }
+
+    setIsLoading(true);
+    try {
+      // First register as a lead (name = dafaId for identification)
+      const regRes = await api.post('/api/auth/lead-register', {
+        fullName: trimDafaId,
+        mobile: trimMobile,
+      });
+      const { accessToken } = regRes.data;
+      localStorage.setItem('accessToken', accessToken);
+      localStorage.setItem('leadSession', 'true');
+      api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+
+      // Then submit the link verification request
+      await api.post('/api/leads/request-link', { dafaxbetId: trimDafaId });
+
+      setSuccess('✅ Request submitted! Our agent will verify your Dafa ID and link it shortly. Please wait in the chat...');
+      setTimeout(() => {
+        window.location.href = '/customer';
+      }, 2000);
+    } catch (err) {
+      // If already registered as lead, try login + submit request
+      if (err.response?.status === 409) {
+        try {
+          const loginRes = await api.post('/api/auth/lead-login', { mobile: trimMobile });
+          const { accessToken } = loginRes.data;
+          localStorage.setItem('accessToken', accessToken);
+          localStorage.setItem('leadSession', 'true');
+          api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+          await api.post('/api/leads/request-link', { dafaxbetId: trimDafaId });
+          setSuccess('✅ Request submitted! Our agent will verify your Dafa ID and link it shortly. Please wait in the chat...');
+          setTimeout(() => { window.location.href = '/customer'; }, 2000);
+        } catch (e2) {
+          setError(e2.response?.data?.error || 'Failed to submit request. Please try again.');
+        }
+      } else {
+        setError(err.response?.data?.error || 'Failed to submit request. Please try again.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const labelCls = `block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDarkCard ? 'text-slate-300' : 'text-text-1'}`;
 
   const mobileInputCls = `flex-1 border-[1.5px] rounded-r-xl px-4 py-3 text-base sm:text-sm font-normal min-h-[48px] outline-none transition-all ${
@@ -264,6 +319,12 @@ const RegisterLead = () => {
               </div>
             )}
 
+            {success && (
+              <div className="p-3 mb-4 bg-green-50 border border-green-200 text-green-700 text-sm rounded-lg font-medium">
+                {success}
+              </div>
+            )}
+
             <AnimatePresence mode="wait">
               {mode === MODE.REGISTER ? (
                 <motion.form
@@ -339,6 +400,17 @@ const RegisterLead = () => {
                     )}
                   </button>
 
+                  {/* I Already Have a Dafa ID Button */}
+                  <button
+                    type="button"
+                    onClick={() => { setMode(MODE.EXISTING); setMobile(''); setDafaId(''); setError(''); }}
+                    className={`w-full min-h-[44px] rounded-xl text-sm font-semibold border-[1.5px] transition-all hover:opacity-90 flex items-center justify-center gap-2 mt-1 ${
+                      isDarkCard ? 'border-slate-600 text-slate-300 hover:bg-slate-800' : 'border-border text-text-2 hover:bg-slate-50'
+                    }`}
+                  >
+                    🔑 I Already Have a Dafa ID
+                  </button>
+
                   <div className="text-center pt-2 text-xs">
                     <span className="opacity-70">Already registered? </span>
                     <button
@@ -355,7 +427,7 @@ const RegisterLead = () => {
                     </button>
                   </div>
                 </motion.form>
-              ) : (
+              ) : mode === MODE.LOGIN ? (
                 <motion.form
                   key="login"
                   initial={{ opacity: 0, x: 10 }}
@@ -427,6 +499,87 @@ const RegisterLead = () => {
                       style={{ color: linkColor }}
                     >
                       Register here
+                    </button>
+                  </div>
+                </motion.form>
+              ) : (
+                <motion.form
+                  key="existing"
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  onSubmit={handleExistingId}
+                  className="space-y-4"
+                >
+                  <div className={`p-3 rounded-xl text-xs border ${
+                    isDarkCard ? 'bg-amber-950/20 border-amber-800/40 text-amber-200' : 'bg-amber-50 border-amber-200 text-amber-800'
+                  }`}>
+                    <span className="font-semibold">🔑 Already have a Dafa ID?</span> Enter your ID and mobile number. Our agent will verify and link your account to Customer Care.
+                  </div>
+
+                  {/* Dafa ID Input */}
+                  <div>
+                    <label htmlFor="existing-dafa-id" className={labelCls}>Your Dafa ID</label>
+                    <input
+                      id="existing-dafa-id"
+                      type="text"
+                      value={dafaId}
+                      onChange={(e) => setDafaId(e.target.value)}
+                      placeholder={`Enter your ${companyName} ID`}
+                      className={textInputCls}
+                      required
+                    />
+                  </div>
+
+                  {/* Mobile Input */}
+                  <div>
+                    <label htmlFor="existing-mobile" className={labelCls}>Mobile Number</label>
+                    <div className="flex">
+                      <span className={`inline-flex items-center px-3.5 rounded-l-xl border-[1.5px] border-r-0 text-base sm:text-sm font-semibold select-none ${
+                        isDarkCard ? 'bg-slate-900/30 border-slate-700/50 text-slate-400' : 'bg-slate-50 border-border text-text-3'
+                      }`}>+91</span>
+                      <input
+                        id="existing-mobile"
+                        type="text"
+                        inputMode="numeric"
+                        value={mobile}
+                        onChange={(e) => setMobile(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                        placeholder="98765 43210"
+                        maxLength={10}
+                        required
+                        className={mobileInputCls}
+                      />
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full btn-primary min-h-[48px] rounded-xl text-base font-semibold transition-all hover:opacity-95 flex items-center justify-center gap-2 mt-2"
+                    style={{ backgroundColor: btnBg, color: btnText }}
+                  >
+                    {isLoading ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                        </svg>
+                        Submitting...
+                      </span>
+                    ) : (
+                      'Submit Verification Request'
+                    )}
+                  </button>
+
+                  <div className="text-center pt-2 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => { setMode(MODE.REGISTER); setMobile(''); setDafaId(''); setError(''); }}
+                      className="font-bold underline hover:opacity-80"
+                      style={{ color: linkColor }}
+                    >
+                      ← Back to Register
                     </button>
                   </div>
                 </motion.form>
