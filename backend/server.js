@@ -855,11 +855,7 @@ io.on('connection', async (socket) => {
     await safeRedis.del(`user_socket:${userId}`);
     io.emit('user_status', { userId, status: 'offline' });
     logger.info(`Socket disconnected: ${socket.id} (user: ${userId})`);
-
-    if (userRole !== 'customer') {
-      const { updateUserStatus } = require('./utils/activitySystem');
-      await updateUserStatus(userId, 'offline', io);
-    }
+    // NOTE: Agent status NOT changed on disconnect — status is manual only.
   });
 });
 
