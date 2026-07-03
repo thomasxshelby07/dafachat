@@ -631,6 +631,8 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
       await User.findByIdAndUpdate(customer.userId, { fullName: dafaxbetId.trim() });
     }
 
+    const hadDafaId = !!lead.requestedDafaId;
+
     // Update Lead status
     lead.status = 'converted';
     lead.requestedDafaId = undefined;
@@ -656,15 +658,20 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
       } catch (e) {}
 
       // Build the chat message
-      let msgContent = `Congratulations! Your Dafa Gaming ID has been created.\n\n`;
-      msgContent += `**Dafa ID / Username:** ${dafaxbetId.trim()}\n`;
-      if (password && password.trim()) {
-        msgContent += `**Password:** ${password.trim()}\n`;
-      }
-      msgContent += `\n`;
-      msgContent += `You can start playing now. You have been granted 24x7 full Customer Support. No need to log out, you can now access deposit and withdrawal support directly from the dashboard.\n\n`;
-      if (siteLoginLink) {
-        msgContent += `[Play Now on Game Site](${siteLoginLink})`;
+      let msgContent = '';
+      if (hadDafaId) {
+        msgContent = `Now you connect with customer support\n\n[Chat with Customer Support](#chat-with-support)`;
+      } else {
+        msgContent = `Congratulations! Your Dafa Gaming ID has been created.\n\n`;
+        msgContent += `**Dafa ID / Username:** ${dafaxbetId.trim()}\n`;
+        if (password && password.trim()) {
+          msgContent += `**Password:** ${password.trim()}\n`;
+        }
+        msgContent += `\n`;
+        msgContent += `You can start playing now. You have been granted 24x7 full Customer Support. No need to log out, you can now access deposit and withdrawal support directly from the dashboard.\n\n`;
+        if (siteLoginLink) {
+          msgContent += `[Play Now on Game Site](${siteLoginLink})`;
+        }
       }
 
       const systemMsg = new Message({

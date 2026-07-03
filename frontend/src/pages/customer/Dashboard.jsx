@@ -71,6 +71,7 @@ const CustomerDashboard = () => {
   const [showNotificationPrompt, setShowNotificationPrompt] = useState(false);
   const [broadcasts, setBroadcasts] = useState([]);
   const [upgradedDafaId, setUpgradedDafaId] = useState(null);
+  const [isExistingIdUpgrade, setIsExistingIdUpgrade] = useState(false);
   const pendingPrefilledMessageRef = useRef(false);
 
   useEffect(() => {
@@ -205,6 +206,7 @@ const CustomerDashboard = () => {
     const handleNewBroadcast = () => loadBroadcasts();
     const handleLeadUpgraded = async (data) => {
       setUpgradedDafaId(data.dafaxbetId);
+      setIsExistingIdUpgrade(!!user?.requestedDafaId);
       const mobile = data.mobile || user?.mobile;
       if (mobile && data.dafaxbetId) {
         try {
@@ -343,6 +345,11 @@ const CustomerDashboard = () => {
               setActiveChat(null);
               loadChats();
             }} 
+            onChatWithSupportClick={() => {
+              setActiveChat(null);
+              setShowIssueSelector(true);
+              loadChats();
+            }}
             onMenuClick={() => {}} 
           />
         </div>
@@ -371,6 +378,10 @@ const CustomerDashboard = () => {
               <button
                 onClick={() => {
                   setUpgradedDafaId(null);
+                  if (isExistingIdUpgrade) {
+                    setActiveChat(null);
+                    setShowIssueSelector(true);
+                  }
                   loadChats();
                 }}
                 className="w-full text-white font-extrabold py-3.5 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-sm shadow-md"

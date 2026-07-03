@@ -11,6 +11,8 @@ const WidgetDemo = () => {
     headerBg: '#111827',
   });
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
   useEffect(() => {
     // Load public branding settings to match colors
     api.get('/api/settings/public')
@@ -24,6 +26,41 @@ const WidgetDemo = () => {
       })
       .catch((err) => console.error('Failed to load branding:', err));
   }, []);
+
+  useEffect(() => {
+    if (isOpen) {
+      setUnreadCount(0);
+      return;
+    }
+
+    const fetchUnreadCount = async () => {
+      const token = localStorage.getItem('accessToken');
+      if (!token) {
+        setUnreadCount(0);
+        return;
+      }
+      try {
+        const res = await api.get('/api/chats', {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        const chatsList = res.data.chats || [];
+        const totalUnread = chatsList
+          .filter(c => c.status === 'active')
+          .reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+        setUnreadCount(totalUnread);
+      } catch (err) {
+        console.error('Failed to fetch unread count:', err);
+        if (err.response?.status === 401) {
+          setUnreadCount(0);
+        }
+      }
+    };
+
+    fetchUnreadCount();
+
+    const interval = setInterval(fetchUnreadCount, 5000);
+    return () => clearInterval(interval);
+  }, [isOpen]);
 
   return (
     <div className="min-h-screen bg-[#0a0f18] text-[#f1f5f9] font-sans overflow-x-hidden relative selection:bg-[#fbbf24] selection:text-[#0f172a]">
@@ -204,15 +241,39 @@ const WidgetDemo = () => {
       {!isOpen && (
         <button
           onClick={() => setIsOpen(!isOpen)}
-          className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full shadow-2xl flex items-center justify-center hover:scale-105 active:scale-95 transition-all cursor-pointer focus:outline-none focus:ring-4 focus:ring-amber-500/20 group"
-          style={{ backgroundColor: branding.primaryColor }}
+          className="fixed bottom-6 right-6 z-50 w-16 h-16 rounded-full shadow-3xl flex items-center justify-center hover:scale-110 active:scale-95 hover:shadow-[0_8px_30px_rgb(0,0,0,0.4)] transition-all duration-300 cursor-pointer focus:outline-none group border-2 border-white/10"
+          style={{ 
+            background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})`,
+            boxShadow: `0 10px 25px -5px ${branding.primaryColor || '#B91C1C'}50, 0 8px 10px -6px ${branding.primaryColor || '#B91C1C'}50`
+          }}
           aria-label="Toggle live support chat"
         >
-          <div className="relative">
-            <svg className="w-6 h-6 text-white group-hover:rotate-6 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+          <div className="relative flex items-center justify-center w-10 h-10">
+            <svg 
+              className="w-7 h-7 text-white drop-shadow-[0_2px_4px_rgba(0,0,0,0.2)] group-hover:scale-105 transition-transform duration-300" 
+              fill="none" 
+              viewBox="0 0 24 24" 
+              stroke="currentColor" 
+              strokeWidth="2"
+            >
+              <path 
+                strokeLinecap="round" 
+                strokeLinejoin="round" 
+                d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" 
+              />
             </svg>
-            <span className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 bg-emerald-400 border-2 border-white rounded-full animate-pulse" />
+            
+            {unreadCount > 0 ? (
+              <span 
+                className="absolute -top-1.5 -right-1.5 min-w-[20px] h-5 px-1.5 bg-red-600 border-2 border-white rounded-full flex items-center justify-center shadow-lg animate-bounce scale-110 animate-pulse"
+              >
+                <span className="text-[9px] font-black text-white tracking-tighter">
+                  {unreadCount > 9 ? '9+' : unreadCount}
+                </span>
+              </span>
+            ) : (
+              <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-emerald-500 border-2 border-white rounded-full shadow-md flex-shrink-0 animate-pulse" />
+            )}
           </div>
         </button>
       )}

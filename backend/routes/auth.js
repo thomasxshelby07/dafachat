@@ -866,7 +866,7 @@ router.post('/customer-verify', async (req, res) => {
         senderRole: 'customer',
         senderName: customer.fullName || '',
         type: 'text',
-        content: `Sir, please verify my ID: ${cleanDafaId}`,
+        content: `I want to talk to customer support`,
         createdAt: new Date(),
       });
       await verifyMessage.save();
@@ -957,7 +957,7 @@ router.post('/customer-verify', async (req, res) => {
       senderRole: 'customer',
       senderName: newUser.fullName || '',
       type: 'text',
-      content: `Sir, please verify my ID: ${cleanDafaId}`,
+      content: `I want to talk to customer support`,
       createdAt: new Date(),
     });
     await verifyMessage.save();

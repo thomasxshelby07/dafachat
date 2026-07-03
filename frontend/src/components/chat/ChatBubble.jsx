@@ -15,7 +15,7 @@ const roleColors = {
   customer: 'bg-gray-100 text-gray-700',
 };
 
-const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImageClick }) => {
+const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImageClick, onChatWithSupportClick }) => {
   const [showMenu, setShowMenu] = useState(false);
 
   const formatTime = (date) => {
@@ -250,16 +250,26 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
         const linkUrl = match[2];
         const isExternal = linkUrl.startsWith('http');
         
+        const handleClick = (e) => {
+          if (linkUrl === '#chat-with-support' || linkUrl === '#open-support-options') {
+            e.preventDefault();
+            if (onChatWithSupportClick) {
+              onChatWithSupportClick();
+            }
+          }
+        };
+
         return (
           <a
             key={index}
             href={linkUrl}
+            onClick={handleClick}
             target={isExternal ? "_blank" : undefined}
             rel={isExternal ? "noopener noreferrer" : undefined}
-            className="inline-block bg-primary text-white font-extrabold text-xs px-3.5 py-1.5 rounded-lg shadow-sm hover:brightness-110 active:scale-95 transition-all my-1 text-center decoration-none"
+            className="inline-block bg-primary text-white font-extrabold text-xs px-3.5 py-1.5 rounded-lg shadow-sm hover:brightness-110 active:scale-95 transition-all my-1 text-center decoration-none cursor-pointer"
             style={{ textDecoration: 'none', backgroundColor: 'var(--primary)' }}
           >
-            🔑 {linkText}
+            {linkUrl === '#chat-with-support' || linkUrl === '#open-support-options' ? '💬' : '🔑'} {linkText}
           </a>
         );
       }

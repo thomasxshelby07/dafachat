@@ -8,7 +8,7 @@ import ChatInput from './ChatInput';
 import TypingIndicator from './TypingIndicator';
 import DateSeparator from './DateSeparator';
 
-const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
+const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => {
   const { user } = useAuth();
   const { joinRoom, leaveRoom, sendMessage, startTyping, stopTyping, markRead, deleteMessage, on, off } = useSocket();
   const [messages, setMessages] = useState([]);
@@ -421,6 +421,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
                 viewerRole={user?.role}
                 onDelete={user?.role !== 'customer' ? handleDeleteMessage : null}
                 onImageClick={setZoomedImage}
+                onChatWithSupportClick={onChatWithSupportClick}
               />
             </div>
           ))}
