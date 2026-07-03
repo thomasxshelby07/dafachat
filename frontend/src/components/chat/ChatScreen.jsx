@@ -431,9 +431,14 @@ const ChatScreen = ({ chatId, onBack, onMenuClick }) => {
 
         {user?.role === 'customer' && chat?.agentId && (chat.agentId.status === 'offline' || chat.agentId.status === 'break') ? (
           <div className="bg-surface border-t border-border p-4 space-y-3">
-            <div className="bg-warning/10 border border-warning/30 text-warning px-3.5 py-3 rounded-lg text-xs space-y-1">
-              <p className="font-semibold text-text-1">⚠️ This agent is offline/on break right now. You can connect with other active agents below:</p>
-              <p className="font-semibold font-hindi text-text-1">यह एजेंट अभी ऑफलाइन/ब्रेक पर है। आप नीचे दिए गए सक्रिय (ऑनलाइन) एजेंटों से जुड़ सकते हैं:</p>
+            <div className="bg-warning/10 border border-warning/30 text-warning px-3.5 py-3 rounded-lg text-xs flex gap-2.5 items-start">
+              <svg className="w-5 h-5 text-warning shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+              </svg>
+              <div className="space-y-1">
+                <p className="font-semibold text-text-1">This agent is offline/on break right now. You can connect with other active agents below:</p>
+                <p className="font-semibold font-hindi text-text-1">यह एजेंट अभी ऑफलाइन/ब्रेक पर है। आप नीचे दिए गए सक्रिय (ऑनलाइन) एजेंटों से जुड़ सकते हैं:</p>
+              </div>
             </div>
             
             <div className="space-y-2 max-h-56 overflow-y-auto">

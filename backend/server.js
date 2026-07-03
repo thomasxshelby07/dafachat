@@ -721,14 +721,47 @@ io.on('connection', async (socket) => {
             const messageObj = firstMessage.toObject();
             messageObj.senderName = socket.user.fullName;
 
+            // Load welcome message setting for this category
+            const settingKey = `welcome_message_${issueType}`;
+            let welcomeSetting = await Settings.findOne({ key: settingKey });
+            let welcomeText = welcomeSetting?.value;
+            if (!welcomeText) {
+              const defaults = {
+                deposit: 'Welcome! Please share a screenshot of your transaction and your registered number so we can process your deposit quickly.',
+                withdrawal: 'Welcome! Please share your gaming ID and registered mobile number so we can check your withdrawal status.',
+                new_id: 'Welcome! How can we help you create a new DAFAXBET account? Please share your name and mobile number.',
+                other: 'Welcome to DAFAXBET Support. How can we help you today?',
+              };
+              welcomeText = defaults[issueType] || defaults.other;
+            }
+
+            const agent = freshChat.agentId ? await User.findById(freshChat.agentId) : null;
+            const welcomeMsg = new Message({
+              chatId: freshChat._id,
+              senderId: agent ? agent._id : null,
+              senderRole: 'agent',
+              senderName: agent ? agent.fullName : 'Support Agent',
+              content: welcomeText,
+              type: 'text',
+              status: 'sent',
+            });
+            await welcomeMsg.save();
+
+            const welcomeMsgObj = welcomeMsg.toObject();
+            welcomeMsgObj.senderName = agent ? agent.fullName : 'Support Agent';
+
             // Send to all staff
             const allStaff = await User.find({ role: { $in: ['agent', 'manager', 'super_admin'] }, isActive: true }).select('_id');
             for (const staff of allStaff) {
               const staffSocket = userSocketMap[staff._id.toString()];
-              if (staffSocket) io.to(staffSocket).emit('new_message', messageObj);
+              if (staffSocket) {
+                io.to(staffSocket).emit('new_message', messageObj);
+                io.to(staffSocket).emit('new_message', welcomeMsgObj);
+              }
             }
             // Send back to customer
             io.to(socket.id).emit('new_message', messageObj);
+            io.to(socket.id).emit('new_message', welcomeMsgObj);
           }
         } catch (error) {
           logger.error('Background start_chat processing error:', error);
@@ -865,6 +898,15 @@ const PORT = process.env.PORT || 5000;
 
 const startServer = async () => {
   await connectDB();
+
+  // Clean up empty dafaxbetId strings to prevent sparse unique index conflicts
+  try {
+    const CustomerModel = require('./models/Customer');
+    await CustomerModel.updateMany({ dafaxbetId: "" }, { $unset: { dafaxbetId: 1 } });
+    logger.info('Cleaned up empty string dafaxbetId fields to prevent index conflicts.');
+  } catch (err) {
+    logger.error('Failed to clean empty dafaxbetId fields from database:', err);
+  }
 
   try {
     const allSettings = await Settings.find();

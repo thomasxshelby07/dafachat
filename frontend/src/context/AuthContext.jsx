@@ -57,6 +57,24 @@ export const AuthProvider = ({ children }) => {
     return response.data; // includes isNewUser, message
   };
 
+  const customerRegisterLead = async (fullName, mobile) => {
+    const response = await api.post('/api/auth/customer-register-lead', { fullName, mobile });
+    const { user, accessToken } = response.data;
+    localStorage.setItem('accessToken', accessToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+    setUser(user);
+    return response.data;
+  };
+
+  const customerVerify = async (fullName, mobile, dafaxbetId) => {
+    const response = await api.post('/api/auth/customer-verify', { fullName, mobile, dafaxbetId });
+    const { user, accessToken } = response.data;
+    localStorage.setItem('accessToken', accessToken);
+    api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+    setUser(user);
+    return response.data;
+  };
+
   const adminLogin = async (email, password) => {
     const response = await api.post('/api/auth/admin-login', { email, password });
     const { user, accessToken } = response.data;
@@ -89,6 +107,8 @@ export const AuthProvider = ({ children }) => {
     adminLogin,
     register,
     smartLogin,
+    customerRegisterLead,
+    customerVerify,
     logout,
     updateUser,
     isAuthenticated: !!user,

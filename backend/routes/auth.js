@@ -34,6 +34,49 @@ const setRefreshTokenCookie = (res, token) => {
   });
 };
 
+const autoAssignNewIdAgent = async (lead, customer) => {
+  try {
+    const Chat = require('../models/Chat');
+    
+    // Find active online users specializing in 'new_id'
+    const candidates = await User.find({
+      isActive: true,
+      status: 'online',
+      role: { $in: ['agent', 'manager', 'super_admin'] },
+      'permissions.issueTypes': 'new_id',
+    });
+
+    if (candidates.length > 0) {
+      // Balance load by selecting candidate with least active chats
+      let bestAgent = candidates[0];
+      let minCount = Infinity;
+      for (const cand of candidates) {
+        const count = await Chat.countDocuments({ agentId: cand._id, status: 'active' });
+        if (count < minCount) {
+          minCount = count;
+          bestAgent = cand;
+        }
+      }
+      
+      // Assign agent to lead
+      lead.assignedAgent = bestAgent._id;
+      lead.assignedAgents = [bestAgent._id];
+      lead.status = 'assigned';
+      lead.timeline.push({
+        event: `Auto-assigned to ${bestAgent.fullName} (New ID Specialist) on registration`,
+        date: new Date(),
+        by: bestAgent._id,
+      });
+
+      // Assign agent to customer
+      customer.assignedAgent = bestAgent._id;
+      customer.leadStatus = 'assigned';
+    }
+  } catch (err) {
+    logger.error('Failed to auto-assign new_id agent:', err);
+  }
+};
+
 // Customer Registration
 router.post('/register', validate(registerSchema), async (req, res) => {
   try {
@@ -239,6 +282,15 @@ router.get('/me', auth, async (req, res) => {
         userObj.dafaxbetId = customer.dafaxbetId;
         userObj.customerId = customer._id;
         userObj.customerNumber = customer.customerId;
+
+        // Also fetch Lead status and requested Dafa ID
+        const lead = await Lead.findOne({ customerId: customer._id });
+        if (lead) {
+          userObj.leadStatus = lead.status;
+          userObj.requestedDafaId = lead.requestedDafaId;
+        } else {
+          userObj.leadStatus = 'new';
+        }
       }
     }
     res.json({ user: userObj });
@@ -592,6 +644,347 @@ router.post('/lead-login', async (req, res) => {
   } catch (error) {
     logger.error('Lead login error:', error);
     res.status(500).json({ error: 'Login failed' });
+  }
+});
+
+// Customer Register Lead (Flow A - New ID Manual Creation)
+router.post('/customer-register-lead', async (req, res) => {
+  try {
+    const { fullName, mobile } = req.body;
+
+    if (!fullName || !mobile) {
+      return res.status(400).json({ error: 'Name and mobile number are required' });
+    }
+
+    const formattedMobile = mobile.trim().startsWith('+91') ? mobile.trim() : `+91${mobile.trim()}`;
+
+    let user = await User.findOne({ mobile: formattedMobile });
+    let customer;
+    let lead;
+
+    if (user) {
+      // User exists. Let's find customer
+      customer = await Customer.findOne({ userId: user._id });
+      if (!customer) {
+        customer = new Customer({
+          userId: user._id,
+          fullName: fullName.trim(),
+          mobile: formattedMobile,
+        });
+        await customer.save();
+      }
+
+      if (customer.dafaxbetId && customer.dafaxbetId.trim() !== '') {
+        return res.status(409).json({ error: 'This mobile number is already registered and verified. Please login using "Already Have a Dafa Gaming ID".' });
+      }
+
+      // Check if lead exists, otherwise create it
+      lead = await Lead.findOne({ customerId: customer._id });
+      if (!lead) {
+        lead = new Lead({
+          customerId: customer._id,
+          status: 'new',
+          issueType: 'new_id',
+          timeline: [{
+            event: 'Lead created for new ID creation',
+            date: new Date(),
+            by: user._id,
+          }],
+        });
+        await autoAssignNewIdAgent(lead, customer);
+        await lead.save();
+        await customer.save();
+      } else {
+        // Reset lead to new, issueType to new_id
+        lead.status = 'new';
+        lead.issueType = 'new_id';
+        lead.timeline.push({
+          event: 'Lead reset for new ID creation',
+          date: new Date(),
+          by: user._id,
+        });
+        await autoAssignNewIdAgent(lead, customer);
+        await lead.save();
+        await customer.save();
+      }
+    } else {
+      // Create new User, Customer, and Lead
+      user = new User({
+        fullName: fullName.trim(),
+        mobile: formattedMobile,
+        role: 'customer',
+      });
+      await user.save();
+
+      customer = new Customer({
+        userId: user._id,
+        fullName: user.fullName,
+        mobile: user.mobile,
+      });
+      await customer.save();
+
+      lead = new Lead({
+        customerId: customer._id,
+        status: 'new',
+        issueType: 'new_id',
+        timeline: [{
+          event: 'New Lead registered for manual ID creation',
+          date: new Date(),
+          by: user._id,
+        }],
+      });
+      await autoAssignNewIdAgent(lead, customer);
+      await lead.save();
+      await customer.save();
+    }
+
+    const { accessToken, refreshToken } = generateTokens(user._id);
+    setRefreshTokenCookie(res, refreshToken);
+
+    logger.info(`Customer registered new lead: ${formattedMobile}`);
+
+    const userObj = user.toJSON();
+    userObj.dafaxbetId = '';
+    userObj.customerId = customer._id;
+    userObj.customerNumber = customer.customerId;
+    userObj.leadStatus = lead.status;
+    userObj.requestedDafaId = lead.requestedDafaId;
+
+    res.status(201).json({
+      message: 'Registration successful',
+      user: userObj,
+      customer: customer.toJSON(),
+      accessToken,
+    });
+  } catch (error) {
+    logger.error('Customer register lead error:', error);
+    res.status(500).json({ error: 'Registration failed' });
+  }
+});
+
+// Customer Verify / Login (Flow B - Already Have a Dafa Gaming ID)
+router.post('/customer-verify', async (req, res) => {
+  try {
+    const { fullName, mobile, dafaxbetId } = req.body;
+
+    if (!mobile || !dafaxbetId) {
+      return res.status(400).json({ error: 'Mobile number and Dafa ID are required' });
+    }
+
+    const formattedMobile = mobile.trim().startsWith('+91') ? mobile.trim() : `+91${mobile.trim()}`;
+    const cleanDafaId = dafaxbetId.trim();
+
+    let customer = await Customer.findOne({ mobile: formattedMobile }).populate('userId');
+
+    // Case 1: Customer already exists in DB
+    if (customer && customer.userId) {
+      const userObj = customer.userId.toJSON();
+      
+      // If customer is verified (matches dafaxbetId)
+      if (customer.dafaxbetId && customer.dafaxbetId.toLowerCase() === cleanDafaId.toLowerCase()) {
+        const { accessToken, refreshToken } = generateTokens(customer.userId._id);
+        setRefreshTokenCookie(res, refreshToken);
+
+        userObj.dafaxbetId = customer.dafaxbetId;
+        userObj.customerId = customer._id;
+        userObj.customerNumber = customer.customerId;
+        userObj.leadStatus = 'converted';
+
+        logger.info(`Customer verify login approved: ${formattedMobile}`);
+        return res.json({
+          status: 'approved',
+          user: userObj,
+          customer: customer.toJSON(),
+          accessToken,
+        });
+      }
+
+      // If customer is not verified, look up associated Lead
+      let lead = await Lead.findOne({ customerId: customer._id });
+      if (!lead) {
+        // Create a new verification request lead
+        lead = new Lead({
+          customerId: customer._id,
+          status: 'verification_pending',
+          issueType: 'new_id', // Connect to New ID Team
+          requestedDafaId: cleanDafaId,
+          timeline: [{
+            event: `Customer requested verification for Dafa ID: ${cleanDafaId}`,
+            date: new Date(),
+            by: customer.userId._id,
+          }],
+        });
+        await autoAssignNewIdAgent(lead, customer);
+        await lead.save();
+        await customer.save();
+      }
+
+      // Check status of verification lead
+      if (lead.status === 'verification_failed') {
+        return res.status(400).json({
+          status: 'failed',
+          error: "We couldn't verify your details. Please check your Dafa Gaming ID and registered mobile number, or contact our support team for assistance.",
+        });
+      }
+
+      // If lead is pending verification but matches the requested Dafa ID (or we update it)
+      if (lead.requestedDafaId !== cleanDafaId) {
+        lead.requestedDafaId = cleanDafaId;
+        lead.status = 'verification_pending';
+        lead.timeline.push({
+          event: `Customer updated verification request to Dafa ID: ${cleanDafaId}`,
+          date: new Date(),
+          by: customer.userId._id,
+        });
+        await lead.save();
+      }
+
+      // Ensure an active Chat document is created for this verification request!
+      const Chat = require('../models/Chat');
+      const Message = require('../models/Message');
+      let chat = await Chat.findOne({ customerId: customer._id, status: 'active' });
+      if (!chat) {
+        chat = new Chat({
+          customerId: customer._id,
+          agentId: lead.assignedAgent || null,
+          status: 'active',
+          issueType: 'new_id',
+        });
+        await chat.save();
+        
+        lead.chatId = chat._id;
+        await lead.save();
+      } else if (!chat.agentId && lead.assignedAgent) {
+        chat.agentId = lead.assignedAgent;
+        await chat.save();
+      }
+
+      // Automatically post verification request message in this chat
+      const verifyMessage = new Message({
+        chatId: chat._id,
+        senderId: customer.userId._id,
+        senderRole: 'customer',
+        senderName: customer.fullName || '',
+        type: 'text',
+        content: `Sir, please verify my ID: ${cleanDafaId}`,
+        createdAt: new Date(),
+      });
+      await verifyMessage.save();
+
+      chat.lastMessage = verifyMessage._id;
+      await chat.save();
+
+      const { accessToken, refreshToken } = generateTokens(customer.userId._id);
+      setRefreshTokenCookie(res, refreshToken);
+
+      userObj.dafaxbetId = '';
+      userObj.customerId = customer._id;
+      userObj.customerNumber = customer.customerId;
+      userObj.leadStatus = lead.status;
+      userObj.requestedDafaId = lead.requestedDafaId;
+
+      logger.info(`Customer verify login pending: ${formattedMobile}`);
+      return res.json({
+        status: 'pending',
+        user: userObj,
+        customer: customer.toJSON(),
+        accessToken,
+      });
+    }
+
+    // Case 2: Customer does NOT exist (First-time registration)
+    if (!fullName || !fullName.trim()) {
+      return res.status(400).json({
+        error: 'First-time registration requires Full Name. Please enter your Full Name, Mobile Number, and Dafa ID.',
+      });
+    }
+
+    // Check if Dafa ID is already taken by someone else
+    const existingDafaCustomer = await Customer.findOne({
+      dafaxbetId: { $regex: new RegExp('^' + cleanDafaId.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&') + '$', 'i') }
+    });
+    if (existingDafaCustomer) {
+      return res.status(409).json({ error: 'This Dafa ID is already registered to another mobile number.' });
+    }
+
+    // Create User, Customer, and Lead for verification
+    const newUser = new User({
+      fullName: fullName.trim(),
+      mobile: formattedMobile,
+      role: 'customer',
+    });
+    await newUser.save();
+
+    const newCustomer = new Customer({
+      userId: newUser._id,
+      fullName: newUser.fullName,
+      mobile: formattedMobile,
+    });
+    await newCustomer.save();
+
+    const lead = new Lead({
+      customerId: newCustomer._id,
+      status: 'verification_pending',
+      issueType: 'new_id', // Connects to New ID Team
+      requestedDafaId: cleanDafaId,
+      timeline: [{
+        event: `Customer registered and requested verification for Dafa ID: ${cleanDafaId}`,
+        date: new Date(),
+        by: newUser._id,
+      }],
+    });
+    await autoAssignNewIdAgent(lead, newCustomer);
+    await lead.save();
+    await newCustomer.save();
+
+    // Automatically create an active Chat for verification request!
+    const Chat = require('../models/Chat');
+    const Message = require('../models/Message');
+    const chat = new Chat({
+      customerId: newCustomer._id,
+      agentId: lead.assignedAgent || null,
+      status: 'active',
+      issueType: 'new_id',
+    });
+    await chat.save();
+
+    lead.chatId = chat._id;
+    await lead.save();
+
+    const verifyMessage = new Message({
+      chatId: chat._id,
+      senderId: newUser._id,
+      senderRole: 'customer',
+      senderName: newUser.fullName || '',
+      type: 'text',
+      content: `Sir, please verify my ID: ${cleanDafaId}`,
+      createdAt: new Date(),
+    });
+    await verifyMessage.save();
+
+    chat.lastMessage = verifyMessage._id;
+    await chat.save();
+
+    const { accessToken, refreshToken } = generateTokens(newUser._id);
+    setRefreshTokenCookie(res, refreshToken);
+
+    const userObj = newUser.toJSON();
+    userObj.dafaxbetId = '';
+    userObj.customerId = newCustomer._id;
+    userObj.customerNumber = newCustomer.customerId;
+    userObj.leadStatus = lead.status;
+    userObj.requestedDafaId = lead.requestedDafaId;
+
+    logger.info(`Customer registered verification request: ${formattedMobile} / ${cleanDafaId}`);
+    return res.status(201).json({
+      status: 'pending',
+      user: userObj,
+      customer: newCustomer.toJSON(),
+      accessToken,
+    });
+  } catch (error) {
+    logger.error('Customer verify error:', error);
+    res.status(500).json({ error: 'Failed to verify customer' });
   }
 });
 

@@ -66,13 +66,27 @@ const AgentDashboard = () => {
       alert('Failed to save profile changes');
     }
   };
+  const activeChatRef = useRef(activeChat);
+  useEffect(() => {
+    activeChatRef.current = activeChat;
+  }, [activeChat]);
+
   const chatsRef = useRef(chats);
   chatsRef.current = chats;
 
   const agentIssueTypes = user?.permissions?.issueTypes || [];
 
   const loadChats = async () => {
-    try { const res = await api.get('/api/chats'); setChats(res.data.chats); }
+    try {
+      const res = await api.get('/api/chats');
+      setChats(res.data.chats);
+      if (activeChatRef.current?._id) {
+        const freshActive = res.data.chats.find(c => c._id === activeChatRef.current._id);
+        if (freshActive) {
+          setActiveChat(freshActive);
+        }
+      }
+    }
     catch (error) { console.error('Failed to load chats:', error); }
     finally { setLoading(false); }
   };
@@ -87,8 +101,15 @@ const AgentDashboard = () => {
         if (isConnected) joinRoom(chatId);
       }
     };
+    const handleLeadStatusChanged = () => {
+      loadChats();
+    };
     window.addEventListener('open-chat', handleOpenChat);
-    return () => window.removeEventListener('open-chat', handleOpenChat);
+    window.addEventListener('lead-status-changed', handleLeadStatusChanged);
+    return () => {
+      window.removeEventListener('open-chat', handleOpenChat);
+      window.removeEventListener('lead-status-changed', handleLeadStatusChanged);
+    };
   }, [isConnected, joinRoom]);
 
   useEffect(() => { if (reconnected > 0) loadChats(); }, [reconnected]);

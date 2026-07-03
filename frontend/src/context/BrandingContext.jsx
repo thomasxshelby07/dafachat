@@ -15,13 +15,13 @@ const getApiUrl = () => {
 
 export const BrandingProvider = ({ children }) => {
   const [branding, setBranding] = useState({
-    companyName: 'DAFA Bet',
+    companyName: 'DAFAXBET',
     logo: '',
     favicon: '',
     primaryColor: '#B91C1C',
     secondaryColor: '#991B1B',
     headerBg: '#111827',
-    footerText: '© 2026 DAFA Bet. All rights reserved.',
+    footerText: '© 2026 DAFAXBET. All rights reserved.',
     playNowBgColor: '#B91C1C',
     playNowTextColor: '#FFFFFF',
     authLinkColor: '#B91C1C',
@@ -30,7 +30,7 @@ export const BrandingProvider = ({ children }) => {
   });
 
   const [homepage, setHomepage] = useState({
-    welcomeText: 'Welcome to DAFA Support',
+    welcomeText: 'Welcome to DAFAXBET Support',
     supportHeader: 'How can we help you?',
     playNowLabel: 'Play Now',
     playNowUrl: '#',

@@ -20,7 +20,7 @@ const leadSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['new', 'assigned', 'in_progress', 'follow_up', 'interested', 'converted', 'closed', 'deposit_done', 'withdrawal_done', 'issue_solved', 'issue_not_solved'],
+    enum: ['new', 'assigned', 'in_progress', 'follow_up', 'interested', 'converted', 'closed', 'deposit_done', 'withdrawal_done', 'issue_solved', 'issue_not_solved', 'verification_pending', 'verification_failed'],
     default: 'new',
   },
   issueType: {

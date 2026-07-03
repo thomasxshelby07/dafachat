@@ -208,13 +208,13 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
           </div>
           <button
             onClick={cancelRecording}
-            className="px-3 py-1.5 text-sm text-danger hover:bg-danger/10 rounded-md transition-colors"
+            className="px-3 py-1.5 text-sm text-danger hover:bg-danger/10 rounded-xl transition-colors cursor-pointer"
           >
             Cancel
           </button>
           <button
             onClick={stopRecording}
-            className="px-4 py-1.5 bg-primary text-white text-sm font-medium rounded-md hover:bg-primary-hover transition-colors"
+            className="px-4 py-1.5 bg-primary text-white text-sm font-medium rounded-xl hover:bg-primary-hover transition-colors cursor-pointer"
           >
             Send
           </button>
@@ -292,7 +292,7 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
               onChange={handleChange}
               onKeyDown={handleKeyDown}
               placeholder="Type a message..."
-              className="w-full resize-none rounded-none px-4 py-2.5 text-sm placeholder-text-3 focus:outline-none focus:ring-2 focus:ring-primary/20 max-h-[120px] bg-bg border border-border"
+              className="w-full resize-none rounded-xl px-4 py-2 text-sm placeholder-text-3 focus:outline-none focus:ring-2 focus:ring-primary/20 max-h-[120px] bg-bg border border-border"
               rows={1}
             />
           </div>
@@ -300,7 +300,7 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
           {message.trim() ? (
             <button
               onClick={handleSend}
-              className="w-10 h-10 rounded-none bg-primary flex items-center justify-center text-white hover:bg-primary-hover transition-colors flex-shrink-0"
+              className="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white hover:bg-primary-hover transition-colors flex-shrink-0 cursor-pointer"
               aria-label="Send message"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -310,7 +310,7 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
           ) : (
             <button
               onClick={startRecording}
-              className="w-10 h-10 rounded-none bg-bg border border-border flex items-center justify-center text-text-2 hover:text-primary hover:border-primary transition-colors flex-shrink-0"
+              className="w-10 h-10 rounded-full bg-bg border border-border flex items-center justify-center text-text-2 hover:text-primary hover:border-primary transition-colors flex-shrink-0 cursor-pointer"
               aria-label="Record voice"
             >
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">

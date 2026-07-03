@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../hooks/api';
@@ -49,9 +50,13 @@ const formatTime = (date) => {
 };
 
 const CustomerDashboard = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const { branding, homepage } = useBranding();
   const { isConnected, reconnected, on, off, startChat, joinRoom, sendMessage } = useSocket();
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isEmbed = true;
+  const isIframe = window.self !== window.top;
   const [chats, setChats] = useState([]);
   const [activeChat, setActiveChat] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -134,7 +139,10 @@ const CustomerDashboard = () => {
   }, [banners]);
 
   const loadChats = async () => {
-    try { const res = await api.get('/api/chats'); setChats(res.data.chats); }
+    try { 
+      const res = await api.get('/api/chats'); 
+      setChats(res.data.chats); 
+    }
     catch (error) { console.error('Failed to load chats:', error); }
     finally { setLoading(false); }
   };
@@ -197,31 +205,30 @@ const CustomerDashboard = () => {
     const handleNewBroadcast = () => loadBroadcasts();
     const handleLeadUpgraded = async (data) => {
       setUpgradedDafaId(data.dafaxbetId);
-      // Auto-login: use the mobile from the event (or fallback to current user's mobile)
       const mobile = data.mobile || user?.mobile;
       if (mobile && data.dafaxbetId) {
         try {
-          // Small delay so customer sees the congrats message in chat first
-          setTimeout(async () => {
-            try {
-              // Login as existing customer with the new Dafa ID
-              await api.post('/api/auth/smart-login', {
-                mobile: mobile,
-                dafaxbetId: data.dafaxbetId,
-                flow: 'existing',
-              }).then(res => {
-                const { user: newUser, accessToken } = res.data;
-                localStorage.setItem('accessToken', accessToken);
-                localStorage.removeItem('leadSession');
-                // Hard redirect to customer care dashboard
-                window.location.href = '/';
-              });
-            } catch (e) {
-              // Fallback: just show upgrade screen, let them login manually
-              console.warn('Auto-login failed, showing manual redirect:', e);
-            }
-          }, 3000);
-        } catch (e) {}
+          // Silent session refresh to update session token without logging them out
+          const res = await api.post('/api/auth/customer-verify', {
+            mobile: mobile,
+            dafaxbetId: data.dafaxbetId,
+          });
+          const { user: newUser, accessToken } = res.data;
+          localStorage.setItem('accessToken', accessToken);
+          api.defaults.headers.common['Authorization'] = `Bearer ${accessToken}`;
+          
+          if (typeof updateUser === 'function') {
+            updateUser(newUser);
+          }
+        } catch (e) {
+          console.warn('Silent session refresh failed:', e);
+        }
+      }
+    };
+
+    const handleLeadVerificationFailed = () => {
+      if (typeof updateUser === 'function') {
+        updateUser({ leadStatus: 'verification_failed' });
       }
     };
 
@@ -235,6 +242,7 @@ const CustomerDashboard = () => {
     on('announcements_changed', handleAnnouncementsChanged);
     on('new_broadcast', handleNewBroadcast);
     on('lead_upgraded', handleLeadUpgraded);
+    on('lead_verification_failed', handleLeadVerificationFailed);
     on('error', handleError);
     return () => {
       off('chat_joined', handleChatJoined);
@@ -247,6 +255,7 @@ const CustomerDashboard = () => {
       off('announcements_changed', handleAnnouncementsChanged);
       off('new_broadcast', handleNewBroadcast);
       off('lead_upgraded', handleLeadUpgraded);
+      off('lead_verification_failed', handleLeadVerificationFailed);
       off('error', handleError);
     };
   }, [on, off]);
@@ -279,6 +288,11 @@ const CustomerDashboard = () => {
     startChat('new_id');
   };
 
+  const handleRedirectToVerify = async () => {
+    await logout();
+    navigate(isEmbed ? '/login?view=existing_id&embed=true' : '/login?view=existing_id');
+  };
+
   const handleLinkExistingId = async () => {
     const dafaId = window.prompt("Enter your existing Dafa ID:");
     if (!dafaId || !dafaId.trim()) return;
@@ -306,8 +320,23 @@ const CustomerDashboard = () => {
 
   if (activeChat) {
     return (
-      <div className="fixed inset-0 bg-bg flex justify-center" style={brandingStyles}>
-        <div className="w-full max-w-lg h-full bg-surface border-x border-border flex flex-col shadow-float overflow-hidden">
+      <div 
+        className={isIframe 
+          ? "h-screen w-full flex flex-col overflow-hidden bg-bg" 
+          : "min-h-screen w-full bg-[#0a0f18] flex justify-center items-center p-0 sm:p-4"
+        } 
+        style={{
+          ...brandingStyles,
+          paddingTop: isIframe ? '0px' : 'calc(env(safe-area-inset-top, 0px) + 12px)',
+          paddingBottom: isIframe ? '0px' : 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
+        }}
+      >
+        <div 
+          className={isIframe 
+            ? "w-full h-full bg-surface flex flex-col overflow-hidden" 
+            : "w-full max-w-[420px] h-screen sm:h-[720px] bg-surface sm:border sm:border-border/60 sm:rounded-[28px] sm:shadow-2xl flex flex-col overflow-hidden relative"
+          }
+        >
           <ChatScreen 
             chatId={activeChat._id} 
             onBack={() => {
@@ -326,9 +355,9 @@ const CustomerDashboard = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
               </div>
-              <h3 className="text-lg font-bold text-text-1 mb-2">🎉 Account Upgraded!</h3>
+               <h3 className="text-lg font-bold text-text-1 mb-2">Account Upgraded</h3>
               <p className="text-sm text-text-2 mb-4 leading-relaxed">
-                Your Player ID has been successfully created.
+                Your Player ID has been successfully verified!
               </p>
               <div className="bg-bg border border-border/80 rounded-lg p-3.5 mb-5 select-all">
                 <span className="text-[11px] uppercase tracking-wider text-text-3 font-semibold block mb-1">Your Dafa ID</span>
@@ -336,18 +365,18 @@ const CustomerDashboard = () => {
                   {upgradedDafaId}
                 </span>
               </div>
-              <p className="text-[11px] text-text-3 mb-5 leading-normal">
-                For security, please log out and log in again using <span className="font-semibold">Customer Care</span> with your Dafa ID and mobile number for further support, deposits, and withdrawals.
+              <p className="text-xs text-text-3 mb-5 font-medium leading-normal">
+                Now you can chat with customer care.
               </p>
               <button
-                onClick={async () => {
-                  await logout();
-                  window.location.href = '/login';
+                onClick={() => {
+                  setUpgradedDafaId(null);
+                  loadChats();
                 }}
-                className="w-full py-3 px-4 font-bold rounded-xl text-white shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
+                className="w-full text-white font-extrabold py-3.5 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-sm shadow-md"
                 style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
               >
-                Continue to Login
+                Start Chatting
               </button>
             </div>
           </div>
@@ -357,18 +386,34 @@ const CustomerDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-bg" style={brandingStyles}>
+    <div 
+      className={isIframe 
+        ? "h-screen w-full bg-bg overflow-hidden relative" 
+        : "min-h-screen w-full bg-[#0a0f18] flex justify-center items-center p-0 sm:p-4"
+      } 
+      style={brandingStyles}
+    >
+      <div 
+        className={isIframe 
+          ? "w-full h-full bg-bg flex flex-col overflow-y-auto overflow-x-hidden relative scrollbar-none" 
+          : "w-full max-w-[420px] h-screen sm:h-[720px] bg-bg sm:border sm:border-border/60 sm:rounded-[28px] sm:shadow-2xl flex flex-col overflow-y-auto overflow-x-hidden relative scrollbar-none"
+        }
+      >
       {breakAlert && (
-        <div className="fixed top-4 left-4 right-4 z-50 bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center gap-3 shadow-card">
-          <span className="text-lg">⏰</span>
-          <p className="text-sm text-text-1 flex-1">{breakAlert}</p>
+        <div className="fixed top-4 left-4 right-4 z-50 bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center gap-3 shadow-card animate-slide-in">
+          <svg className="w-5 h-5 text-warning shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <p className="text-xs text-text-1 flex-1">{breakAlert}</p>
         </div>
       )}
 
       {showNotificationPrompt && (
         <div className="bg-primary text-white px-4 py-3 flex items-center justify-between gap-3 text-xs md:text-sm font-semibold select-none shadow-md" style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}>
           <div className="flex items-center gap-2">
-            <span>🔔</span>
+            <svg className="w-4 h-4 text-white shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            </svg>
             <span>Please enable notifications to receive support replies instantly.</span>
           </div>
           <button 
@@ -382,38 +427,40 @@ const CustomerDashboard = () => {
       )}
 
       {/* Header */}
-      <header className="sticky top-0 z-40 shadow-md" style={{ backgroundColor: branding.headerBg || '#111827' }}>
-        <div className="max-w-lg mx-auto px-4 h-14 grid grid-cols-3 items-center">
-          {/* Left: Logout */}
-          <div className="flex items-center justify-start">
-            <button onClick={logout} className="text-white/70 hover:text-white p-1.5 rounded hover:bg-white/10 transition-all" aria-label="Logout">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-            </button>
-          </div>
+      {!isEmbed && (
+        <header className="sticky top-0 z-40 shadow-md" style={{ backgroundColor: branding.headerBg || '#111827' }}>
+          <div className="max-w-lg mx-auto px-4 h-14 grid grid-cols-3 items-center">
+            {/* Left: Logout */}
+            <div className="flex items-center justify-start">
+              <button onClick={logout} className="text-white/70 hover:text-white p-1.5 rounded hover:bg-white/10 transition-all" aria-label="Logout">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              </button>
+            </div>
 
-          {/* Center: Centered Logo or Title */}
-          <div className="flex flex-col items-center justify-center text-center">
-            {branding.logo ? (
-              <img src={branding.logo} alt={branding.companyName || 'DAFAX'} className="h-8 object-contain" />
-            ) : (
-              <h1 className="text-sm font-extrabold text-white tracking-wider truncate max-w-[120px]">
-                {branding.companyName || 'DAFAX'}
-              </h1>
-            )}
-            <div className="flex items-center gap-1 mt-0.5">
-              <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-white/40'}`} />
-              <span className="text-[9px] text-white/70 font-semibold tracking-wide uppercase">{isConnected ? 'Online' : 'Connecting...'}</span>
+            {/* Center: Centered Logo or Title */}
+            <div className="flex flex-col items-center justify-center text-center">
+              {branding.logo ? (
+                <img src={branding.logo} alt={branding.companyName || 'DAFAX'} className="h-8 object-contain" />
+              ) : (
+                <h1 className="text-sm font-extrabold text-white tracking-wider truncate max-w-[120px]">
+                  {branding.companyName || 'DAFAX'}
+                </h1>
+              )}
+              <div className="flex items-center gap-1 mt-0.5">
+                <div className={`w-1.5 h-1.5 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-white/40'}`} />
+                <span className="text-[9px] text-white/70 font-semibold tracking-wide uppercase">{isConnected ? 'Online' : 'Connecting...'}</span>
+              </div>
+            </div>
+
+            {/* Right: Notification */}
+            <div className="flex items-center justify-end">
+              <NotificationBell className="text-white hover:text-white/80" />
             </div>
           </div>
+        </header>
+      )}
 
-          {/* Right: Notification */}
-          <div className="flex items-center justify-end">
-            <NotificationBell className="text-white hover:text-white/80" />
-          </div>
-        </div>
-      </header>
-
-      <main className="max-w-lg mx-auto pb-6">
+      <main className="w-full max-w-lg mx-auto pb-6">
         {showIssueSelector ? (
           <div className="px-4 pt-6">
             <div className="mb-5">
@@ -482,7 +529,7 @@ const CustomerDashboard = () => {
         ) : (
           <>
             {/* Scrolling Announcement Bar */}
-            {announcements.length > 0 && (
+            {!isEmbed && announcements.length > 0 && (
               <div className="bg-primary/10 text-primary text-xs h-9 flex items-center border-b border-primary/20 overflow-hidden relative select-none">
                 <div className="animate-marquee whitespace-nowrap flex gap-8 py-1.5">
                   {announcements.map((ann, idx) => (
@@ -507,119 +554,230 @@ const CustomerDashboard = () => {
             )}
 
             {/* Banners Carousel / Fallback Header Banner */}
-            <div className="relative h-[180px] w-full bg-gradient-to-r from-primary-light to-primary-light/50 overflow-hidden select-none border-b border-border">
-              {banners.length > 0 ? (
-                banners.map((banner, index) => (
-                  <div
-                    key={banner._id}
-                    className={`absolute inset-0 transition-opacity duration-1000 ${
-                      index === activeBannerIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'
-                    }`}
-                  >
-                    <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
-                    {banner.title && (
-                      <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 text-white">
-                        <p className="text-[10px] font-bold uppercase tracking-wider opacity-85">{banner.type}</p>
-                        <h4 className="text-xs font-semibold mt-0.5">{banner.title}</h4>
-                      </div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                // Fallback elegant brand container if no banners are uploaded
-                <div className="w-full h-full flex items-center justify-center p-6 text-center">
-                  <div>
-                    <h3 className="text-base font-extrabold text-text-1 tracking-wider uppercase">{branding.companyName || 'DAFAX Bet'}</h3>
-                    <p className="text-xs text-text-2 mt-1">{homepage.supportHeader || 'Premium 24/7 Support Console'}</p>
-                  </div>
-                </div>
-              )}
-
-              {/* Banner indicators (dots) - centered */}
-              {banners.length > 1 && (
-                <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-10">
-                  {banners.map((_, index) => (
-                    <button
-                      key={index}
-                      onClick={() => setActiveBannerIndex(index)}
-                      className={`w-1.5 h-1.5 rounded-full transition-all ${
-                        index === activeBannerIndex ? 'bg-white scale-125' : 'bg-white/40'
+            {!isEmbed && (
+              <div className="relative h-[180px] w-full bg-gradient-to-r from-primary-light to-primary-light/50 overflow-hidden select-none border-b border-border">
+                {banners.length > 0 ? (
+                  banners.map((banner, index) => (
+                    <div
+                      key={banner._id}
+                      className={`absolute inset-0 transition-opacity duration-1000 ${
+                        index === activeBannerIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'
                       }`}
-                      aria-label={`Go to slide ${index + 1}`}
-                    />
-                  ))}
-                </div>
-              )}
+                    >
+                      <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+                      {banner.title && (
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 text-white">
+                          <p className="text-[10px] font-bold uppercase tracking-wider opacity-85">{banner.type}</p>
+                          <h4 className="text-xs font-semibold mt-0.5">{banner.title}</h4>
+                        </div>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  // Fallback elegant brand container if no banners are uploaded
+                  <div className="w-full h-full flex items-center justify-center p-6 text-center">
+                    <div>
+                      <h3 className="text-base font-extrabold text-text-1 tracking-wider uppercase">{branding.companyName || 'DAFAX Bet'}</h3>
+                      <p className="text-xs text-text-2 mt-1">{homepage.supportHeader || 'Premium 24/7 Support Console'}</p>
+                    </div>
+                  </div>
+                )}
 
-              {/* Play Now CTA Button - placed bottom right of banner frame */}
-              {homepage.playNowUrl && (
-                <a
-                  href={homepage.playNowUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="absolute bottom-3 right-3 z-20 px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wider rounded-lg shadow-float transition-all active:scale-95 flex items-center gap-1 hover:brightness-110"
-                  style={{
-                    backgroundColor: branding.playNowBgColor || branding.primaryColor || '#B91C1C',
-                    color: branding.playNowTextColor || '#FFFFFF'
-                  }}
-                >
-                  <span>{homepage.playNowLabel || 'Play Now'}</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
-                  </svg>
-                </a>
-              )}
-            </div>
+                {/* Banner indicators (dots) - centered */}
+                {banners.length > 1 && (
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+                    {banners.map((_, index) => (
+                      <button
+                        key={index}
+                        onClick={() => setActiveBannerIndex(index)}
+                        className={`w-1.5 h-1.5 rounded-full transition-all ${
+                          index === activeBannerIndex ? 'bg-white scale-125' : 'bg-white/40'
+                        }`}
+                        aria-label={`Go to slide ${index + 1}`}
+                      />
+                    ))}
+                  </div>
+                )}
+
+                {/* Play Now CTA Button - placed bottom right of banner frame */}
+                {homepage.playNowUrl && (
+                  <a
+                    href={homepage.playNowUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="absolute bottom-3 right-3 z-20 px-3.5 py-1.5 text-[11px] font-extrabold uppercase tracking-wider rounded-lg shadow-float transition-all active:scale-95 flex items-center gap-1 hover:brightness-110"
+                    style={{
+                      backgroundColor: branding.playNowBgColor || branding.primaryColor || '#B91C1C',
+                      color: branding.playNowTextColor || '#FFFFFF'
+                    }}
+                  >
+                    <span>{homepage.playNowLabel || 'Play Now'}</span>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                    </svg>
+                  </a>
+                )}
+              </div>
+            )}
 
 
             {/* Welcome message */}
             <div className="px-4 pt-5 pb-1">
               <h2 className="text-lg font-bold text-text-1">
-                {!user?.dafaxbetId ? 'Get Your New ID' : (homepage.welcomeText || 'Welcome to Support')}
+                {user?.requestedDafaId 
+                  ? 'Verifying Your ID' 
+                  : !user?.dafaxbetId 
+                    ? 'Get Your New ID' 
+                    : (homepage.welcomeText || 'Welcome to Support')}
               </h2>
               <p className="text-xs text-text-2 mt-0.5">
-                {!user?.dafaxbetId ? 'Connect with a specialist to set up your new account.' : (homepage.supportHeader || 'How can we help you?')}
+                {user?.requestedDafaId 
+                  ? 'We are currently checking your gaming account details.' 
+                  : !user?.dafaxbetId 
+                    ? 'Connect with a specialist to set up your new account.' 
+                    : (homepage.supportHeader || 'How can we help you?')}
               </p>
             </div>
 
             {/* Start Chat Button */}
             {!user?.dafaxbetId ? (
               <div className="px-4 py-2 flex flex-col gap-3">
-                {/* Auto ID Button */}
-                <button
-                  onClick={handleAutoIdRedirect}
-                  className="w-full text-white font-bold py-3.5 rounded-xl transition-all shadow active:scale-[0.98] flex items-center justify-center gap-2 border-0 cursor-pointer text-sm"
-                  style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
-                >
-                  ⚡ AUTO CREATE ID
-                </button>
-
-                {/* Manual ID Button */}
-                <button
-                  onClick={handleManualIdStart}
-                  disabled={startingChat}
-                  className="w-full bg-surface text-text-1 font-bold py-3.5 border border-border rounded-xl transition-all shadow active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 cursor-pointer text-sm"
-                >
-                  💬 CHAT FOR MANUAL ID
-                </button>
-
-                {/* I Already Have ID Button */}
-                <button
-                  onClick={handleLinkExistingId}
-                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3.5 border border-slate-200 rounded-xl transition-all shadow active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer text-sm"
-                >
-                  🔑 I ALREADY HAVE A DAFA ID
-                </button>
+                {/* If verification is pending */}
+                {(user?.leadStatus === 'verification_pending' || (user?.leadStatus && ['new', 'assigned', 'in_progress', 'follow_up'].includes(user.leadStatus) && user.requestedDafaId)) ? (
+                  user?.requestedDafaId ? (
+                    /* Flow B: Already has Dafa ID and is verifying */
+                    <div className="space-y-4">
+                      <div className="p-4.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-2xl text-xs leading-relaxed shadow-sm flex flex-col gap-2.5">
+                        <div className="flex items-start gap-3">
+                          <div className="relative flex-shrink-0 mt-0.5">
+                            <span className="animate-ping absolute inline-flex h-4 w-4 rounded-full bg-emerald-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500" />
+                          </div>
+                          <div>
+                            <span className="font-extrabold text-emerald-800 block mb-1 uppercase tracking-wider">Checking ID: {user.requestedDafaId}</span>
+                            <span className="text-emerald-700 font-semibold">
+                              Wait 2 minutes, we are checking your ID then we will connect you to customer support for further issues.
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Flow A: Wants New ID */
+                    <div className="space-y-3.5">
+                      <div className="p-4 bg-amber-50 border border-amber-200 text-amber-800 rounded-2xl text-xs leading-relaxed shadow-sm flex items-start gap-2.5">
+                        <svg className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <span className="font-extrabold text-amber-800 block mb-0.5">Verification In Process</span>
+                          <span className="text-amber-700 font-medium">
+                            Verification is under process. Please wait while our team verifies your details. You will receive full Customer Support access once the verification is completed.
+                          </span>
+                        </div>
+                      </div>
+                      <button
+                        onClick={handleManualIdStart}
+                        disabled={startingChat}
+                        className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md"
+                        style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
+                      >
+                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                        </svg>
+                        <span>Chat with New ID Team</span>
+                      </button>
+                    </div>
+                  )
+                ) : user?.leadStatus === 'verification_failed' ? (
+                  <div className="space-y-3.5">
+                    <div className="p-4 bg-red-50 border border-red-200 text-red-800 rounded-2xl text-xs leading-relaxed shadow-sm flex items-start gap-2.5">
+                      <svg className="w-5 h-5 text-red-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                      </svg>
+                      <div>
+                        <span className="font-extrabold text-red-800 block mb-0.5">Verification Failed</span>
+                        <span className="text-red-700 font-medium">
+                          We couldn't verify your details. Please check your Dafa Gaming ID and registered mobile number, or contact our support team for assistance.
+                        </span>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={handleManualIdStart}
+                      disabled={startingChat}
+                      className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md"
+                      style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
+                    >
+                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <span>Chat with Support Agent</span>
+                    </button>
+                    
+                    <button
+                      onClick={handleLinkExistingId}
+                      className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer text-xs tracking-wider uppercase bg-gradient-to-r from-[#1e293b] to-[#0f172a] hover:from-[#334155] hover:to-[#1e293b] border border-slate-700/60 shadow-md"
+                    >
+                      <svg className="w-4 h-4 text-amber-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                      </svg>
+                      <span>Re-submit Dafa ID for Verification</span>
+                    </button>
+                  </div>
+                ) : (
+                  // Normal New Lead
+                  <>
+                    <div className="p-3.5 bg-blue-50 border border-blue-200 text-blue-800 rounded-2xl text-xs font-semibold leading-relaxed flex flex-col gap-2 shadow-sm">
+                      <div className="flex items-start gap-2.5">
+                        <svg className="w-5 h-5 text-blue-600 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>You are currently unverified. Deposit, withdrawal, and other support services will be available immediately after your Gaming ID is created or verified.</span>
+                      </div>
+                      <div className="pl-7 mt-0.5">
+                        <span className="text-slate-600">Already have a Dafa ID? </span>
+                        <button 
+                          onClick={handleRedirectToVerify}
+                          className="text-amber-600 hover:text-amber-700 underline font-bold cursor-pointer bg-transparent border-0 p-0 text-xs inline ml-1"
+                        >
+                          Verify it here
+                        </button>
+                      </div>
+                    </div>
+                    {/* Manual ID Button */}
+                    <button
+                      onClick={handleManualIdStart}
+                      disabled={startingChat}
+                      className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md"
+                      style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
+                    >
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                      </svg>
+                      <span>CHAT WITH NEW ID TEAM</span>
+                    </button>
+                    
+                    {/* Auto ID Button */}
+                    <button
+                      onClick={handleAutoIdRedirect}
+                      className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer text-xs tracking-wider uppercase bg-gradient-to-r from-[#1e293b] to-[#0f172a] hover:from-[#334155] hover:to-[#1e293b] border border-slate-700/60 shadow-md"
+                    >
+                      <svg className="w-5 h-5 text-amber-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span>AUTO SITE REGISTRATION</span>
+                    </button>
+                  </>
+                )}
               </div>
             ) : (
               <div className="px-4 py-2">
                 <button
                   onClick={handleStartChat}
                   disabled={startingChat}
-                  className="w-full text-white font-bold py-3.5 rounded-xl transition-all shadow active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-sm"
-                  style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = branding.secondaryColor || '#991B1B'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = branding.primaryColor || '#B91C1C'}
+                  className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-sm tracking-wider uppercase shadow-md"
+                  style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
                   Start New Chat
@@ -732,52 +890,69 @@ const CustomerDashboard = () => {
 
             {/* Profile */}
             <div className="px-4 pt-4">
-              <div className="bg-surface border border-border p-4 flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary-light flex items-center justify-center flex-shrink-0">
-                  <span className="text-sm font-bold text-primary">{user?.fullName?.charAt(0) || 'U'}</span>
+              <div className="bg-surface border border-border p-4 flex items-center justify-between gap-3 rounded-2xl shadow-sm">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div 
+                    className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 font-bold"
+                    style={{ backgroundColor: `${branding.primaryColor || '#B91C1C'}15`, color: branding.primaryColor || '#B91C1C' }}
+                  >
+                    {user?.fullName?.charAt(0) || 'U'}
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-bold text-text-1 truncate">{user?.fullName}</p>
+                    <p className="text-xs text-text-2 mt-0.5">{user?.mobile}</p>
+                  </div>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-text-1">{user?.fullName}</p>
-                  <p className="text-xs text-text-2">{user?.mobile}</p>
-                </div>
+                
+                <button 
+                  onClick={logout}
+                  className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 hover:bg-red-500/15 text-red-400 hover:text-red-300 border border-red-500/20 hover:border-red-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer active:scale-95 flex-shrink-0"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                  </svg>
+                  <span>Logout</span>
+                </button>
               </div>
             </div>
 
                 {/* FAQ Accordion Section */}
-                <div className="px-4 pt-6 pb-2">
-                  <p className="text-xs font-semibold text-text-3 uppercase tracking-wider mb-3">Help & FAQ</p>
-                  <div className="space-y-2">
-                    {(homepage.faqs || [
-                      { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },
-                      { q: 'How long does a withdrawal take?', a: 'Withdrawals are processed within 15-30 minutes. If there is a delay, please contact support by opening a "Withdrawal Issue" chat.' },
-                      { q: 'How do I verify my account?', a: 'Upload a clear copy of your Identity document in your profile settings or share it directly with our support agent in chat.' },
-                      { q: 'Is my personal data secure?', a: 'Yes, we use global bank-grade encryption to protect all your account data.' },
-                    ]).map((faq, idx) => (
-                      <div key={idx} className="border border-border bg-surface">
-                        <button
-                          onClick={() => setFaqOpenIndex(faqOpenIndex === idx ? null : idx)}
-                          className="w-full px-4 py-3 flex items-center justify-between text-left"
-                        >
-                          <span className="text-xs font-semibold text-text-1">{faq.q}</span>
-                          <svg
-                            className="w-4 h-4 text-text-3 ml-2 transition-transform duration-200"
-                            style={{ transform: faqOpenIndex === idx ? 'rotate(180deg)' : 'rotate(0deg)' }}
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor"
+                {!isEmbed && (
+                  <div className="px-4 pt-6 pb-2">
+                    <p className="text-xs font-semibold text-text-3 uppercase tracking-wider mb-3">Help & FAQ</p>
+                    <div className="space-y-2">
+                      {(homepage.faqs || [
+                        { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },
+                        { q: 'How long does a withdrawal take?', a: 'Withdrawals are processed within 15-30 minutes. If there is a delay, please contact support by opening a "Withdrawal Issue" chat.' },
+                        { q: 'How do I verify my account?', a: 'Upload a clear copy of your Identity document in your profile settings or share it directly with our support agent in chat.' },
+                        { q: 'Is my personal data secure?', a: 'Yes, we use global bank-grade encryption to protect all your account data.' },
+                      ]).map((faq, idx) => (
+                        <div key={idx} className="border border-border bg-surface">
+                          <button
+                            onClick={() => setFaqOpenIndex(faqOpenIndex === idx ? null : idx)}
+                            className="w-full px-4 py-3 flex items-center justify-between text-left"
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
-                        {faqOpenIndex === idx && (
-                          <div className="px-4 pb-3 pt-1 text-xs text-text-2 border-t border-border/50 bg-bg/30 leading-relaxed">
-                            {faq.a}
-                          </div>
-                        )}
-                      </div>
-                    ))}
+                            <span className="text-xs font-semibold text-text-1">{faq.q}</span>
+                            <svg
+                              className="w-4 h-4 text-text-3 ml-2 transition-transform duration-200"
+                              style={{ transform: faqOpenIndex === idx ? 'rotate(180deg)' : 'rotate(0deg)' }}
+                              fill="none"
+                              viewBox="0 0 24 24"
+                              stroke="currentColor"
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                          {faqOpenIndex === idx && (
+                            <div className="px-4 pb-3 pt-1 text-xs text-text-2 border-t border-border/50 bg-bg/30 leading-relaxed">
+                              {faq.a}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
-                </div>
+                )}
             
             <div className="px-4 py-4 text-center">
               <p className="text-[10px] text-text-3">{branding.footerText || `© ${new Date().getFullYear()} ${branding.companyName || 'DAFAX Bet'}. All rights reserved.`}</p>
@@ -785,41 +960,7 @@ const CustomerDashboard = () => {
           </>
         )}
       </main>
-
-      {upgradedDafaId && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-          <div className="bg-surface border border-border/60 rounded-2xl p-6 max-w-sm w-full text-center shadow-2xl">
-            <div className="w-16 h-16 bg-success/10 text-success rounded-full flex items-center justify-center mx-auto mb-4 border border-success/20 animate-bounce">
-              <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-            </div>
-            <h3 className="text-lg font-bold text-text-1 mb-2">🎉 Account Upgraded!</h3>
-            <p className="text-sm text-text-2 mb-4 leading-relaxed">
-              Your Player ID has been successfully created.
-            </p>
-            <div className="bg-bg border border-border/80 rounded-lg p-3.5 mb-5 select-all">
-              <span className="text-[11px] uppercase tracking-wider text-text-3 font-semibold block mb-1">Your Dafa ID</span>
-              <span className="text-xl font-extrabold text-primary font-mono block tracking-wider animate-pulse" style={{ color: branding.primaryColor || '#B91C1C' }}>
-                {upgradedDafaId}
-              </span>
-            </div>
-            <p className="text-[11px] text-text-3 mb-5 leading-normal">
-              For security, please log out and log in again using <span className="font-semibold">Customer Care</span> with your Dafa ID and mobile number for further support, deposits, and withdrawals.
-            </p>
-            <button
-              onClick={async () => {
-                await logout();
-                window.location.href = '/login';
-              }}
-              className="w-full py-3 px-4 font-bold rounded-xl text-white shadow-lg active:scale-95 transition-all text-sm cursor-pointer"
-              style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}
-            >
-              Continue to Login
-            </button>
-          </div>
-        </div>
-      )}
+      </div>
     </div>
   );
 };

@@ -10,6 +10,7 @@ const AgentDashboard = lazy(() => import('./pages/agent/Dashboard'));
 const ManagerDashboard = lazy(() => import('./pages/manager/Dashboard'));
 const AdminDashboard = lazy(() => import('./pages/admin/Dashboard'));
 const ProtectedRoute = lazy(() => import('./components/ProtectedRoute'));
+const WidgetDemo = lazy(() => import('./pages/WidgetDemo'));
 
 const LoadingFallback = () => (
   <div className="min-h-screen flex items-center justify-center bg-bg">
@@ -42,7 +43,7 @@ function App() {
         } />
 
         <Route path="/register" element={
-          isAuthenticated ? customerRedirect : <RegisterLead />
+          isAuthenticated ? customerRedirect : <SmartEntry />
         } />
 
         <Route path="/admin-login" element={
@@ -92,6 +93,8 @@ function App() {
             ) : '/login'
           } replace />
         } />
+
+        <Route path="/customercare" element={<WidgetDemo />} />
 
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

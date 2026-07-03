@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSocket } from '../../hooks/useSocket';
 import api from '../../hooks/api';
 import { useBranding } from '../../context/BrandingContext';
@@ -81,7 +81,7 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
   const isCustomer = user?.role === 'customer';
   const otherParty = isCustomer ? chat?.agentId : chat?.customerId;
 
-  useEffect(() => {
+  const fetchLead = useCallback(() => {
     if (!isCustomer && chat?.customerId?._id) {
       api.get(`/api/leads?customerId=${chat.customerId._id}`).then(res => {
         if (res.data.leads?.length > 0) {
@@ -92,6 +92,14 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
       }).catch(() => {});
     }
   }, [chat, isCustomer]);
+
+  useEffect(() => {
+    fetchLead();
+    window.addEventListener('lead-status-changed', fetchLead);
+    return () => {
+      window.removeEventListener('lead-status-changed', fetchLead);
+    };
+  }, [fetchLead]);
 
   useEffect(() => {
     const handleAgentStatusChanged = (data) => {
@@ -198,9 +206,22 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
         password: password ? password.trim() : '',
       });
       alert("Lead upgraded to Client successfully!");
-      window.location.reload();
+      window.dispatchEvent(new CustomEvent('lead-status-changed'));
     } catch (error) {
       alert(error.response?.data?.error || "Failed to upgrade lead");
+    }
+  };
+
+  const handleRejectVerification = async (e) => {
+    e.stopPropagation();
+    if (!lead?._id) return;
+    if (!window.confirm(`Are you sure you want to reject the verification request for ${lead.requestedDafaId || 'this player'}?`)) return;
+    try {
+      await api.post(`/api/leads/${lead._id}/reject-verification`);
+      alert("Verification request rejected successfully!");
+      window.dispatchEvent(new CustomEvent('lead-status-changed'));
+    } catch (error) {
+      alert(error.response?.data?.error || "Failed to reject verification");
     }
   };
 
@@ -278,6 +299,15 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
                     >
                       {lead?.requestedDafaId ? '✅ Verify & Approve' : '🔑 Set ID & Upgrade'}
                     </button>
+                    {lead?.requestedDafaId && (
+                      <button
+                        onClick={handleRejectVerification}
+                        title="Reject verification request"
+                        className="px-2 py-0.5 text-[10px] font-bold uppercase rounded bg-red-600 hover:bg-red-700 text-white hover:opacity-90 active:scale-95 transition-all shrink-0 flex items-center gap-1 border border-red-500/20 cursor-pointer select-none"
+                      >
+                        ❌ Reject
+                      </button>
+                    )}
                   </div>
                 )
               )}

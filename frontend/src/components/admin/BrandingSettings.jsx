@@ -24,6 +24,10 @@ const BrandingSettings = () => {
     authLinkColor: '#B91C1C',
     authBtnBgColor: '#B91C1C',
     authBtnTextColor: '#FFFFFF',
+    welcome_message_deposit: '',
+    welcome_message_withdrawal: '',
+    welcome_message_new_id: '',
+    welcome_message_other: '',
     faqs: [],
   });
   const [loading, setLoading] = useState(true);
@@ -461,6 +465,57 @@ const BrandingSettings = () => {
                       className="input-field flex-1"
                     />
                   </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="border-t border-border pt-6 mt-6">
+              <h3 className="text-base font-semibold text-text-1 mb-2">Welcome Message Automation (By Category)</h3>
+              <p className="text-xs text-text-3 mb-4">Define the custom message that will be automatically sent to the customer from the support side when a chat is started or transferred to each category.</p>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">Deposit Welcome Message</label>
+                  <textarea
+                    value={settings.welcome_message_deposit || ''}
+                    onChange={(e) => handleChange('welcome_message_deposit', e.target.value)}
+                    rows={2}
+                    className="input-field w-full"
+                    placeholder="Enter automated message for Deposit chats..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">Withdrawal Welcome Message</label>
+                  <textarea
+                    value={settings.welcome_message_withdrawal || ''}
+                    onChange={(e) => handleChange('welcome_message_withdrawal', e.target.value)}
+                    rows={2}
+                    className="input-field w-full"
+                    placeholder="Enter automated message for Withdrawal chats..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">New ID Welcome Message</label>
+                  <textarea
+                    value={settings.welcome_message_new_id || ''}
+                    onChange={(e) => handleChange('welcome_message_new_id', e.target.value)}
+                    rows={2}
+                    className="input-field w-full"
+                    placeholder="Enter automated message for New ID chats..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">General / Other Welcome Message</label>
+                  <textarea
+                    value={settings.welcome_message_other || ''}
+                    onChange={(e) => handleChange('welcome_message_other', e.target.value)}
+                    rows={2}
+                    className="input-field w-full"
+                    placeholder="Enter automated message for Other chats..."
+                  />
                 </div>
               </div>
             </div>

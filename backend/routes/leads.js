@@ -656,16 +656,16 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
       } catch (e) {}
 
       // Build the chat message
-      let msgContent = `🎉 Congratulations! Your player ID has been created successfully.\n\n`;
-      msgContent += `🔑 **Dafa ID:** ${dafaxbetId.trim()}\n`;
+      let msgContent = `Congratulations! Your Dafa Gaming ID has been created.\n\n`;
+      msgContent += `**Dafa ID / Username:** ${dafaxbetId.trim()}\n`;
       if (password && password.trim()) {
-        msgContent += `🔒 **Password:** ${password.trim()}\n`;
+        msgContent += `**Password:** ${password.trim()}\n`;
       }
       msgContent += `\n`;
+      msgContent += `You can start playing now. You have been granted 24x7 full Customer Support. No need to log out, you can now access deposit and withdrawal support directly from the dashboard.\n\n`;
       if (siteLoginLink) {
-        msgContent += `[🎮 Login to Game Site](${siteLoginLink})\n`;
+        msgContent += `[Play Now on Game Site](${siteLoginLink})`;
       }
-      msgContent += `[💬 Login to Customer Care](/login)`;
 
       const systemMsg = new Message({
         chatId: lead.chatId,
@@ -684,6 +684,7 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
           dafaxbetId: dafaxbetId.trim(),
           mobile: customer.mobile,
         });
+        io.to(lead.chatId.toString()).emit('lead_updated', { lead });
       }
     }
 
@@ -693,6 +694,65 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
     res.status(500).json({ error: 'Failed to upgrade lead' });
   }
 });
+
+// POST /:id/reject-verification — Reject a verification request
+router.post('/:id/reject-verification', auth, isAgentOrAbove, async (req, res) => {
+  try {
+    const lead = await Lead.findById(req.params.id);
+    if (!lead) {
+      return res.status(404).json({ error: 'Lead not found' });
+    }
+
+    const customer = await Customer.findById(lead.customerId);
+    if (!customer) {
+      return res.status(404).json({ error: 'Customer not found' });
+    }
+
+    // Update Lead status to verification_failed
+    lead.status = 'verification_failed';
+    lead.timeline.push({
+      event: `Lead verification rejected/failed`,
+      date: new Date(),
+      by: req.user._id,
+    });
+    await lead.save();
+
+    // Update Customer status
+    customer.leadStatus = 'verification_failed';
+    await customer.save();
+
+    // Send automatic message in the chat
+    if (lead.chatId) {
+      const Message = require('../models/Message');
+
+      const systemMsg = new Message({
+        chatId: lead.chatId,
+        senderId: req.user._id,
+        senderRole: 'agent',
+        content: `❌ We couldn't verify your details. Please check your Dafa Gaming ID and registered mobile number, or contact our support team for assistance.`,
+        type: 'text'
+      });
+      await systemMsg.save();
+
+      // Emit to socket
+      const io = req.app.get('io');
+      if (io) {
+        io.to(lead.chatId.toString()).emit('message', systemMsg);
+        io.to(lead.chatId.toString()).emit('lead_verification_failed', {
+          leadId: lead._id,
+          customerId: customer._id,
+        });
+        io.to(lead.chatId.toString()).emit('lead_updated', { lead });
+      }
+    }
+
+    res.json({ message: 'Lead verification rejected successfully' });
+  } catch (error) {
+    console.error('Lead reject verification error:', error);
+    res.status(500).json({ error: 'Failed to reject verification' });
+  }
+});
+
 
 // POST /request-link — Submit a request to link an existing Dafa ID (Requires verification by agent)
 router.post('/request-link', auth, async (req, res) => {
@@ -731,13 +791,16 @@ router.post('/request-link', auth, async (req, res) => {
 
     // Set the requested ID and status
     lead.requestedDafaId = dafaxbetId.trim();
-    lead.status = 'follow_up'; // Mark it as follow_up to flag for agent review
+    lead.status = 'verification_pending';
     lead.timeline.push({
       event: `Customer requested to link Dafa ID: ${dafaxbetId.trim()}`,
       date: new Date(),
       by: req.user._id,
     });
     await lead.save();
+
+    customer.leadStatus = 'verification_pending';
+    await customer.save();
 
     // Check if chat room exists, if not create one
     let chatId = lead.chatId;
