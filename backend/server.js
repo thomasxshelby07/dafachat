@@ -880,6 +880,38 @@ const startServer = async () => {
     logger.error('Failed to clean empty dafaxbetId fields from database:', err);
   }
 
+  // Migrate chats lastMessage fields
+  try {
+    const Chat = require('./models/Chat');
+    const Message = require('./models/Message');
+
+    const chats = await Chat.find({
+      $or: [
+        { lastMessage: { $exists: false } },
+        { lastExternalMessage: { $exists: false } }
+      ]
+    });
+
+    if (chats.length > 0) {
+      logger.info(`[MIGRATION] Migrating ${chats.length} chats for lastMessage fields...`);
+      for (const chat of chats) {
+        const lastMsg = await Message.findOne({ chatId: chat._id }).sort({ createdAt: -1 });
+        const lastExtMsg = await Message.findOne({ chatId: chat._id, isInternal: false }).sort({ createdAt: -1 });
+
+        const update = {};
+        if (lastMsg) update.lastMessage = lastMsg._id;
+        if (lastExtMsg) update.lastExternalMessage = lastExtMsg._id;
+
+        if (Object.keys(update).length > 0) {
+          await Chat.findByIdAndUpdate(chat._id, update);
+        }
+      }
+      logger.info(`[MIGRATION] Successfully migrated chats.`);
+    }
+  } catch (err) {
+    logger.error('Failed to run lastMessage migration:', err);
+  }
+
   // Auto-seed default banners and announcements if database is empty
   try {
     const bannerCount = await Banner.countDocuments();

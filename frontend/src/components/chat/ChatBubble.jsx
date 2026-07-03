@@ -240,6 +240,19 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
 
   const canDelete = viewerRole !== 'customer' && message.senderRole !== 'customer' && onDelete;
 
+  const parseBoldText = (str) => {
+    if (typeof str !== 'string') return str;
+    const boldRegex = /(\*\*[^*]+\*\*)/g;
+    const segments = str.split(boldRegex);
+    return segments.map((seg, i) => {
+      const match = seg.match(/^\*\*([^*]+)\*\*$/);
+      if (match) {
+        return <strong key={i} className="font-extrabold">{match[1]}</strong>;
+      }
+      return seg;
+    });
+  };
+
   const renderMessageContent = (text) => {
     if (!text) return null;
     const markdownLinkRegex = /(\[[^\]]+\]\([^)]+\))/g;
@@ -275,7 +288,7 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
           </a>
         );
       }
-      return part;
+      return <span key={index}>{parseBoldText(part)}</span>;
     });
   };
 

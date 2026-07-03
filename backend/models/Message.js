@@ -58,6 +58,23 @@ messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ senderId: 1 });
 messageSchema.index({ status: 1 });
 messageSchema.index({ chatId: 1, senderId: 1, status: 1, isInternal: 1 });
+messageSchema.index({ chatId: 1, isInternal: 1, createdAt: -1 });
+
+messageSchema.post('save', async function (doc) {
+  try {
+    const Chat = mongoose.model('Chat');
+    const update = {
+      lastMessage: doc._id,
+      lastMessageAt: doc.createdAt || new Date(),
+    };
+    if (!doc.isInternal) {
+      update.lastExternalMessage = doc._id;
+    }
+    await Chat.findByIdAndUpdate(doc.chatId, update);
+  } catch (err) {
+    console.error('Failed to update chat lastMessage:', err);
+  }
+});
 
 messageSchema.methods.toJSON = function () {
   const obj = this.toObject();

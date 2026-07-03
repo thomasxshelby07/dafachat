@@ -201,14 +201,17 @@ router.patch('/:id/status', auth, isAgentOrAbove, async (req, res) => {
     await Customer.findByIdAndUpdate(lead.customerId, { leadStatus: status });
 
     const io = req.app.get('io');
-    if (io && lead.assignedAgent) {
-      const agentSocket = await getSocketId(req.app, lead.assignedAgent);
-      if (agentSocket) {
-        io.to(agentSocket).emit('lead_status_updated', {
-          leadId: lead._id,
-          status,
-          oldStatus,
-        });
+    if (io) {
+      io.emit('lead_updated', { lead });
+      if (lead.assignedAgent) {
+        const agentSocket = await getSocketId(req.app, lead.assignedAgent);
+        if (agentSocket) {
+          io.to(agentSocket).emit('lead_status_updated', {
+            leadId: lead._id,
+            status,
+            oldStatus,
+          });
+        }
       }
     }
 
@@ -267,6 +270,9 @@ router.post('/:id/assign', auth, isManagerOrAbove, async (req, res) => {
     await notification.save();
 
     const io = req.app.get('io');
+    if (io) {
+      io.emit('lead_updated', { lead });
+    }
     const agentSocket = await getSocketId(req.app, agentId);
     if (agentSocket) {
       io.to(agentSocket).emit('new_lead', {
@@ -386,6 +392,9 @@ router.post('/:id/transfer', auth, isAgentOrAbove, async (req, res) => {
     await notification.save();
 
     const io = req.app.get('io');
+    if (io) {
+      io.emit('lead_updated', { lead });
+    }
     const newAgentSocket = await getSocketId(req.app, agentId);
     if (newAgentSocket) {
       io.to(newAgentSocket).emit('new_lead', {

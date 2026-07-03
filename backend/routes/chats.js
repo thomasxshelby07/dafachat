@@ -39,6 +39,8 @@ router.get('/', auth, async (req, res) => {
     const chats = await Chat.find(query)
       .populate('customerId', 'fullName mobile customerId isOnline lastSeen dafaxbetId')
       .populate('agentId', 'fullName mobile status permissions avatar')
+      .populate('lastMessage')
+      .populate('lastExternalMessage')
       .sort({ lastMessageAt: -1 })
       .skip((page - 1) * limit)
       .limit(parseInt(limit))
@@ -49,35 +51,15 @@ router.get('/', auth, async (req, res) => {
       return res.json({ chats: [], pagination: { page: 1, limit: 20, total: 0, pages: 0 } });
     }
 
-    // Get last messages (exclude internal notes for customers)
-    const lastMsgQuery = { chatId: { $in: chatIds } };
-    if (req.user.role === 'customer') {
-      lastMsgQuery.isInternal = { $ne: true };
-    }
-
-    const lastMessages = await Message.aggregate([
-      { $match: lastMsgQuery },
-      { $sort: { createdAt: -1 } },
-      { $group: {
-        _id: '$chatId',
-        lastMessage: { $first: '$$ROOT' },
-      }},
-    ]);
-
-    const lastMessageMap = {};
-    lastMessages.forEach(lm => {
-      lastMessageMap[lm._id.toString()] = lm.lastMessage;
-    });
-
     // Unread count: messages NOT sent by current user, NOT read, NOT internal (for customers)
     const unreadQuery = {
       chatId: { $in: chatIds },
       senderId: { $ne: req.user._id },
-      status: { $ne: 'read' },
+      status: { $in: ['sent', 'delivered'] },
     };
 
     if (req.user.role === 'customer') {
-      unreadQuery.isInternal = { $ne: true };
+      unreadQuery.isInternal = false;
     }
 
     const unreadCounts = await Message.aggregate([
@@ -95,7 +77,7 @@ router.get('/', auth, async (req, res) => {
 
     const enrichedChats = chats.map(chat => ({
       ...chat,
-      lastMessage: lastMessageMap[chat._id.toString()] || null,
+      lastMessage: req.user.role === 'customer' ? chat.lastExternalMessage : chat.lastMessage,
       unreadCount: unreadMap[chat._id.toString()] || 0,
     }));
 
@@ -141,11 +123,11 @@ router.get('/unread-count', auth, async (req, res) => {
     const unreadQuery = {
       chatId: { $in: chatIds },
       senderId: { $ne: req.user._id },
-      status: { $ne: 'read' },
+      status: { $in: ['sent', 'delivered'] },
     };
 
     if (req.user.role === 'customer') {
-      unreadQuery.isInternal = { $ne: true };
+      unreadQuery.isInternal = false;
     }
 
     const count = await Message.countDocuments(unreadQuery);

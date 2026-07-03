@@ -86,6 +86,10 @@ const autoAssignNewIdAgent = async (lead, customer, io) => {
         }
       }
     }
+
+    if (io) {
+      io.emit('new_lead', { lead: lead.toObject ? lead.toObject() : lead });
+    }
   } catch (err) {
     logger.error('Failed to auto-assign new_id agent:', err);
   }

@@ -35,6 +35,14 @@ const chatSchema = new mongoose.Schema({
   closedAt: {
     type: Date,
   },
+  lastMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+  },
+  lastExternalMessage: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Message',
+  },
   lastMessageAt: {
     type: Date,
     default: Date.now,

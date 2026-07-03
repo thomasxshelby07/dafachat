@@ -1,7 +1,9 @@
 import { useState, useEffect } from 'react';
 import api from '../../hooks/api';
+import { useSocket } from '../../hooks/useSocket';
 
 const LeadTable = ({ onSelectLead }) => {
+  const { on, off } = useSocket();
   const [leads, setLeads] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -35,6 +37,24 @@ const LeadTable = ({ onSelectLead }) => {
   useEffect(() => {
     loadLeads();
   }, [pagination.page, statusFilter, agentFilter, search, startDate, endDate, tagFilter]);
+
+  useEffect(() => {
+    const handleSocketUpdate = () => {
+      loadLeads();
+    };
+
+    on('new_lead', handleSocketUpdate);
+    on('lead_updated', handleSocketUpdate);
+    on('lead_reassigned', handleSocketUpdate);
+    on('new_chat_assigned', handleSocketUpdate);
+
+    return () => {
+      off('new_lead', handleSocketUpdate);
+      off('lead_updated', handleSocketUpdate);
+      off('lead_reassigned', handleSocketUpdate);
+      off('new_chat_assigned', handleSocketUpdate);
+    };
+  }, [on, off]);
 
   const loadAgents = async () => {
     try {
