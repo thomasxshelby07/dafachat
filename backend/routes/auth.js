@@ -34,7 +34,7 @@ const setRefreshTokenCookie = (res, token) => {
   });
 };
 
-const autoAssignNewIdAgent = async (lead, customer) => {
+const autoAssignNewIdAgent = async (lead, customer, io) => {
   try {
     const Chat = require('../models/Chat');
     
@@ -71,6 +71,20 @@ const autoAssignNewIdAgent = async (lead, customer) => {
       // Assign agent to customer
       customer.assignedAgent = bestAgent._id;
       customer.leadStatus = 'assigned';
+
+      // Emit new chat assignment to agent in real-time
+      if (io) {
+        const { getSocketId } = require('../server');
+        const agentSocketId = await getSocketId(bestAgent._id.toString());
+        if (agentSocketId) {
+          io.to(agentSocketId).emit('new_chat_assigned', {
+            chatId: lead.chatId || null,
+            customer: customer.toObject ? customer.toObject() : customer,
+            issueType: 'new_id',
+            message: `${customer.fullName} needs help (New ID verification)`,
+          });
+        }
+      }
     }
   } catch (err) {
     logger.error('Failed to auto-assign new_id agent:', err);
@@ -691,7 +705,8 @@ router.post('/customer-register-lead', async (req, res) => {
             by: user._id,
           }],
         });
-        await autoAssignNewIdAgent(lead, customer);
+        const io = req.app.get('io');
+        await autoAssignNewIdAgent(lead, customer, io);
         await lead.save();
         await customer.save();
       } else {
@@ -703,7 +718,8 @@ router.post('/customer-register-lead', async (req, res) => {
           date: new Date(),
           by: user._id,
         });
-        await autoAssignNewIdAgent(lead, customer);
+        const io = req.app.get('io');
+        await autoAssignNewIdAgent(lead, customer, io);
         await lead.save();
         await customer.save();
       }
@@ -733,7 +749,8 @@ router.post('/customer-register-lead', async (req, res) => {
           by: user._id,
         }],
       });
-      await autoAssignNewIdAgent(lead, customer);
+      const io = req.app.get('io');
+      await autoAssignNewIdAgent(lead, customer, io);
       await lead.save();
       await customer.save();
     }
@@ -814,7 +831,8 @@ router.post('/customer-verify', async (req, res) => {
             by: customer.userId._id,
           }],
         });
-        await autoAssignNewIdAgent(lead, customer);
+        const io = req.app.get('io');
+        await autoAssignNewIdAgent(lead, customer, io);
         await lead.save();
         await customer.save();
       }
@@ -854,25 +872,25 @@ router.post('/customer-verify', async (req, res) => {
         
         lead.chatId = chat._id;
         await lead.save();
+
+        // Automatically post verification request message in this chat
+        const verifyMessage = new Message({
+          chatId: chat._id,
+          senderId: customer.userId._id,
+          senderRole: 'customer',
+          senderName: customer.fullName || '',
+          type: 'text',
+          content: `I want to talk to customer support`,
+          createdAt: new Date(),
+        });
+        await verifyMessage.save();
+
+        chat.lastMessage = verifyMessage._id;
+        await chat.save();
       } else if (!chat.agentId && lead.assignedAgent) {
         chat.agentId = lead.assignedAgent;
         await chat.save();
       }
-
-      // Automatically post verification request message in this chat
-      const verifyMessage = new Message({
-        chatId: chat._id,
-        senderId: customer.userId._id,
-        senderRole: 'customer',
-        senderName: customer.fullName || '',
-        type: 'text',
-        content: `I want to talk to customer support`,
-        createdAt: new Date(),
-      });
-      await verifyMessage.save();
-
-      chat.lastMessage = verifyMessage._id;
-      await chat.save();
 
       const { accessToken, refreshToken } = generateTokens(customer.userId._id);
       setRefreshTokenCookie(res, refreshToken);
@@ -933,7 +951,8 @@ router.post('/customer-verify', async (req, res) => {
         by: newUser._id,
       }],
     });
-    await autoAssignNewIdAgent(lead, newCustomer);
+    const io = req.app.get('io');
+    await autoAssignNewIdAgent(lead, newCustomer, io);
     await lead.save();
     await newCustomer.save();
 

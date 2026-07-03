@@ -57,6 +57,7 @@ const messageSchema = new mongoose.Schema({
 messageSchema.index({ chatId: 1, createdAt: -1 });
 messageSchema.index({ senderId: 1 });
 messageSchema.index({ status: 1 });
+messageSchema.index({ chatId: 1, senderId: 1, status: 1, isInternal: 1 });
 
 messageSchema.methods.toJSON = function () {
   const obj = this.toObject();

@@ -598,152 +598,147 @@ io.on('connection', async (socket) => {
         }
       }
 
-      // Emit chat_joined immediately to dismiss the customer loading spinner instantly!
-      socket.join(chat._id.toString());
-      socket.emit('chat_joined', { chatId: chat._id.toString(), chat: chat.toObject() });
+      // Re-fetch chat fresh context to prevent any cached object issues
+      let freshChat = await Chat.findById(chat._id);
+      if (!freshChat) {
+        return socket.emit('error', { message: 'Failed to initialize chat' });
+      }
 
-      // Process assignments, welcome messages, and notifications in the background
-      (async () => {
-        try {
-          // Re-fetch chat fresh context in background to prevent race conditions
-          const freshChat = await Chat.findById(chat._id);
-          if (!freshChat) return;
+      if (!freshChat.agentId || issueTypeChanged) {
+        const oldAgentId = freshChat.agentId;
+        const agent = await findBestAgent(issueType);
+        if (agent) {
+          // Check if it's actually a different agent
+          if (!oldAgentId || oldAgentId.toString() !== agent._id.toString()) {
+            freshChat.agentId = agent._id;
+            await freshChat.save();
 
-          if (!freshChat.agentId || issueTypeChanged) {
-            const oldAgentId = freshChat.agentId;
-            const agent = await findBestAgent(issueType);
-            if (agent) {
-              // Check if it's actually a different agent
-              if (!oldAgentId || oldAgentId.toString() !== agent._id.toString()) {
-                freshChat.agentId = agent._id;
-                await freshChat.save();
+            // Update customer
+            customer.assignedAgent = agent._id;
+            customer.leadStatus = 'assigned';
+            await customer.save();
 
-                // Update customer
-                customer.assignedAgent = agent._id;
-                customer.leadStatus = 'assigned';
-                await customer.save();
-
-                // Update lead
-                const lead = await Lead.findOne({ customerId: customer._id });
-                if (lead) {
-                  lead.assignedAgent = agent._id;
-                  lead.assignedAgents = [agent._id];
-                  lead.status = 'assigned';
-                  lead.timeline.push({
-                    event: `Auto-reassigned to ${agent.fullName} (${issueType}) due to issue change`,
-                    date: new Date(),
-                    by: userId,
-                  });
-                  lead.lastActivity = new Date();
-                  await lead.save();
-                }
-
-                // Notify the new assigned agent
-                const agentNotif = new Notification({
-                  userId: agent._id,
-                  type: 'agent_assigned',
-                  title: 'New Chat Assigned',
-                  body: `${customer.fullName} needs help with ${issueType}`,
-                  metadata: { chatId: freshChat._id, customerId: customer._id, issueType },
-                });
-                await agentNotif.save();
-                await sendNotificationToUser(agent._id, agentNotif);
-
-                // Emit to agent socket directly
-                const agentSocketId = userSocketMap[agent._id.toString()];
-                if (agentSocketId) {
-                  io.to(agentSocketId).emit('new_chat_assigned', {
-                    chatId: freshChat._id,
-                    customer: customer.toObject(),
-                    issueType,
-                    message: `${customer.fullName} needs help with ${issueType}`,
-                  });
-                }
-
-                // Notify old agent that they were reassigned/unassigned
-                if (oldAgentId) {
-                  const oldAgentSocketId = userSocketMap[oldAgentId.toString()];
-                  if (oldAgentSocketId) {
-                    io.to(oldAgentSocketId).emit('lead_reassigned', {
-                      leadId: lead ? lead._id : null,
-                      chatId: freshChat._id,
-                      newAgent: agent.fullName,
-                    });
-                  }
-                }
-
-                // Notify customer about agent assignment
-                const customerNotif = new Notification({
-                  userId: customer.userId,
-                  type: 'agent_assigned',
-                  title: 'Agent Assigned',
-                  body: `${agent.fullName} is now assisting you`,
-                  metadata: { chatId: freshChat._id, agentId: agent._id },
-                });
-                await customerNotif.save();
-                io.to(socket.id).emit('new_notification', customerNotif);
-
-                // Emit agent_assigned event to customer socket
-                io.to(socket.id).emit('agent_assigned', {
-                  agentName: agent.fullName,
-                  chatId: freshChat._id,
-                });
-              }
-            } else {
-              // No agent available — notify all staff about new chat
-              await notifyAgentsNewChat(freshChat, customer);
-            }
-          }
-
-          // Auto-send welcome message from agent if brand new chat OR if issue type changed
-          const messagesCount = await Message.countDocuments({ chatId: freshChat._id });
-          if (messagesCount === 0 || issueTypeChanged) {
-            // Load welcome message setting for this category
-            const welcomeMessages = {
-              deposit: 'Welcome! Please share a screenshot of your transaction and your registered number so we can process your deposit quickly.',
-              withdrawal: 'Welcome! Please share your gaming ID and registered mobile number so we can check your withdrawal status.',
-              new_id: 'Welcome! How can we help you create a new DAFAXBET account? Please share your name and mobile number.',
-              other: 'Welcome to DAFAXBET Support. How can we help you today?',
-            };
-
-            const settingKey = `welcome_message_${issueType}`;
-            let welcomeSetting = await Settings.findOne({ key: settingKey });
-            let welcomeText = welcomeSetting?.value;
-            if (!welcomeText) {
-              welcomeText = welcomeMessages[issueType] || welcomeMessages.other;
+            // Update lead
+            const lead = await Lead.findOne({ customerId: customer._id });
+            if (lead) {
+              lead.assignedAgent = agent._id;
+              lead.assignedAgents = [agent._id];
+              lead.status = 'assigned';
+              lead.timeline.push({
+                event: `Auto-reassigned to ${agent.fullName} (${issueType}) due to issue change`,
+                date: new Date(),
+                by: userId,
+              });
+              lead.lastActivity = new Date();
+              await lead.save();
             }
 
-            const agent = freshChat.agentId ? await User.findById(freshChat.agentId) : null;
-            const welcomeMsg = new Message({
-              chatId: freshChat._id,
-              senderId: agent ? agent._id : null,
-              senderRole: 'agent',
-              senderName: agent ? agent.fullName : 'Support Agent',
-              content: welcomeText,
-              type: 'text',
-              status: 'sent',
+            // Notify the new assigned agent
+            const agentNotif = new Notification({
+              userId: agent._id,
+              type: 'agent_assigned',
+              title: 'New Chat Assigned',
+              body: `${customer.fullName} needs help with ${issueType}`,
+              metadata: { chatId: freshChat._id, customerId: customer._id, issueType },
             });
-            await welcomeMsg.save();
-            await Chat.findByIdAndUpdate(freshChat._id, { lastMessageAt: new Date() });
+            await agentNotif.save();
+            await sendNotificationToUser(agent._id, agentNotif);
 
-            const welcomeMsgObj = welcomeMsg.toObject();
-            welcomeMsgObj.senderName = agent ? agent.fullName : 'Support Agent';
+            // Emit to agent socket directly
+            const agentSocketId = userSocketMap[agent._id.toString()];
+            if (agentSocketId) {
+              io.to(agentSocketId).emit('new_chat_assigned', {
+                chatId: freshChat._id,
+                customer: customer.toObject(),
+                issueType,
+                message: `${customer.fullName} needs help with ${issueType}`,
+              });
+            }
 
-            // Send to all staff
-            const allStaff = await User.find({ role: { $in: ['agent', 'manager', 'super_admin'] }, isActive: true }).select('_id');
-            for (const staff of allStaff) {
-              const staffSocket = userSocketMap[staff._id.toString()];
-              if (staffSocket) {
-                io.to(staffSocket).emit('new_message', welcomeMsgObj);
+            // Notify old agent that they were reassigned/unassigned
+            if (oldAgentId) {
+              const oldAgentSocketId = userSocketMap[oldAgentId.toString()];
+              if (oldAgentSocketId) {
+                io.to(oldAgentSocketId).emit('lead_reassigned', {
+                  leadId: lead ? lead._id : null,
+                  chatId: freshChat._id,
+                  newAgent: agent.fullName,
+                });
               }
             }
-            // Send back to customer
-            io.to(socket.id).emit('new_message', welcomeMsgObj);
+
+            // Notify customer about agent assignment
+            const customerNotif = new Notification({
+              userId: customer.userId,
+              type: 'agent_assigned',
+              title: 'Agent Assigned',
+              body: `${agent.fullName} is now assisting you`,
+              metadata: { chatId: freshChat._id, agentId: agent._id },
+            });
+            await customerNotif.save();
+            io.to(socket.id).emit('new_notification', customerNotif);
+
+            // Emit agent_assigned event to customer socket
+            io.to(socket.id).emit('agent_assigned', {
+              agentName: agent.fullName,
+              chatId: freshChat._id,
+            });
           }
-        } catch (error) {
-          logger.error('Background start_chat processing error:', error);
+        } else {
+          // No agent available — notify all staff about new chat
+          await notifyAgentsNewChat(freshChat, customer);
         }
-      })();
+      }
+
+      // Auto-send welcome message from agent if brand new chat OR if issue type changed
+      const messagesCount = await Message.countDocuments({ chatId: freshChat._id });
+      if (messagesCount === 0 || issueTypeChanged) {
+        // Load welcome message setting for this category
+        const welcomeMessages = {
+          deposit: 'Welcome! Please share a screenshot of your transaction and your registered number so we can process your deposit quickly.',
+          withdrawal: 'Welcome! Please share your gaming ID and registered mobile number so we can check your withdrawal status.',
+          new_id: 'Welcome! How can we help you create a new DAFAXBET account? Please share your name and mobile number.',
+          other: 'Welcome to DAFAXBET Support. How can we help you today?',
+        };
+
+        const settingKey = `welcome_message_${issueType}`;
+        let welcomeSetting = await Settings.findOne({ key: settingKey });
+        let welcomeText = welcomeSetting?.value;
+        if (!welcomeText) {
+          welcomeText = welcomeMessages[issueType] || welcomeMessages.other;
+        }
+
+        const agent = freshChat.agentId ? await User.findById(freshChat.agentId) : null;
+        const welcomeMsg = new Message({
+          chatId: freshChat._id,
+          senderId: agent ? agent._id : null,
+          senderRole: 'agent',
+          senderName: agent ? agent.fullName : 'Support Agent',
+          content: welcomeText,
+          type: 'text',
+          status: 'sent',
+        });
+        await welcomeMsg.save();
+        await Chat.findByIdAndUpdate(freshChat._id, { lastMessageAt: new Date() });
+
+        const welcomeMsgObj = welcomeMsg.toObject();
+        welcomeMsgObj.senderName = agent ? agent.fullName : 'Support Agent';
+
+        // Send to all staff
+        const allStaff = await User.find({ role: { $in: ['agent', 'manager', 'super_admin'] }, isActive: true }).select('_id');
+        for (const staff of allStaff) {
+          const staffSocket = userSocketMap[staff._id.toString()];
+          if (staffSocket) {
+            io.to(staffSocket).emit('new_message', welcomeMsgObj);
+          }
+        }
+        // Send back to customer
+        io.to(socket.id).emit('new_message', welcomeMsgObj);
+      }
+
+      // Finally, join the room and emit chat_joined!
+      socket.join(freshChat._id.toString());
+      socket.emit('chat_joined', { chatId: freshChat._id.toString(), chat: freshChat.toObject() });
 
     } catch (error) {
       logger.error('Start chat error:', error);
@@ -961,4 +956,4 @@ const startServer = async () => {
 
 startServer();
 
-module.exports = { app, server, io };
+module.exports = { app, server, io, getSocketId, userSocketMap };

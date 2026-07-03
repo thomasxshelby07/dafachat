@@ -18,6 +18,19 @@ cloudinary.config({
   api_secret: sanitizeConfigValue(process.env.CLOUDINARY_API_SECRET),
 });
 
+const printCloudinaryConfigInfo = () => {
+  const secret = process.env.CLOUDINARY_API_SECRET || '';
+  const key = process.env.CLOUDINARY_API_KEY || '';
+  const cloud = process.env.CLOUDINARY_CLOUD_NAME || '';
+  const cleanSecret = sanitizeConfigValue(secret);
+  const cleanKey = sanitizeConfigValue(key);
+  const cleanCloud = sanitizeConfigValue(cloud);
+
+  logger.info(`[CLOUDINARY DIAGNOSTICS] Raw: Cloud="${cloud}", KeyLen=${key.length}, SecretLen=${secret.length}`);
+  logger.info(`[CLOUDINARY DIAGNOSTICS] Sanitized: Cloud="${cleanCloud}", Key="${cleanKey ? cleanKey.substring(0, 4) + '...' + cleanKey.substring(cleanKey.length - 2) : 'NONE'}" (len=${cleanKey.length}), Secret="${cleanSecret ? cleanSecret.substring(0, 4) + '...' + cleanSecret.substring(cleanSecret.length - 2) : 'NONE'}" (len=${cleanSecret.length})`);
+};
+printCloudinaryConfigInfo();
+
 const storage = multer.memoryStorage();
 const upload = multer({
   storage,
@@ -170,8 +183,12 @@ router.post('/media', auth, upload.single('file'), async (req, res) => {
       mimeType: req.file.mimetype,
     });
   } catch (error) {
-    console.error('Media upload error:', error);
-    res.status(500).json({ error: 'Failed to upload media' });
+    console.error('[MEDIA UPLOAD DETAIL ERROR]:', error);
+    res.status(500).json({ 
+      error: 'Failed to upload media',
+      details: error.message || error,
+      code: error.http_code || null
+    });
   }
 });
 

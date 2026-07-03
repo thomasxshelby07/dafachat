@@ -686,7 +686,7 @@ router.post('/:id/upgrade-client', auth, isAgentOrAbove, async (req, res) => {
       // Emit to socket
       const io = req.app.get('io');
       if (io) {
-        io.to(lead.chatId.toString()).emit('message', systemMsg);
+        io.to(lead.chatId.toString()).emit('new_message', systemMsg.toObject ? systemMsg.toObject() : systemMsg);
         io.to(lead.chatId.toString()).emit('lead_upgraded', {
           dafaxbetId: dafaxbetId.trim(),
           mobile: customer.mobile,
@@ -744,7 +744,7 @@ router.post('/:id/reject-verification', auth, isAgentOrAbove, async (req, res) =
       // Emit to socket
       const io = req.app.get('io');
       if (io) {
-        io.to(lead.chatId.toString()).emit('message', systemMsg);
+        io.to(lead.chatId.toString()).emit('new_message', systemMsg.toObject ? systemMsg.toObject() : systemMsg);
         io.to(lead.chatId.toString()).emit('lead_verification_failed', {
           leadId: lead._id,
           customerId: customer._id,
@@ -841,7 +841,7 @@ router.post('/request-link', auth, async (req, res) => {
     // Emit message to room
     const io = req.app.get('io');
     if (io) {
-      io.to(chatId.toString()).emit('message', systemMsg);
+      io.to(chatId.toString()).emit('new_message', systemMsg.toObject ? systemMsg.toObject() : systemMsg);
       io.to(chatId.toString()).emit('lead_updated', { lead });
     }
 

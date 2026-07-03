@@ -48,7 +48,7 @@ export const useSocket = () => {
 
     const socket = io(getSocketUrl(), {
       auth: { token },
-      transports: ['polling', 'websocket'],
+      transports: ['websocket'],
       reconnection: true,
       reconnectionAttempts: Infinity,
       reconnectionDelay: 1000,

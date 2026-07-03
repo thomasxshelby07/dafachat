@@ -48,6 +48,8 @@ chatSchema.index({ agentId: 1 });
 chatSchema.index({ leadId: 1 });
 chatSchema.index({ status: 1 });
 chatSchema.index({ lastMessageAt: -1 });
+chatSchema.index({ customerId: 1, status: 1 });
+chatSchema.index({ agentId: 1, status: 1 });
 
 chatSchema.methods.toJSON = function () {
   const obj = this.toObject();
