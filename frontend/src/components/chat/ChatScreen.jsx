@@ -47,6 +47,11 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
   useEffect(() => {
     if (!chatId) return;
 
+    setLoading(true);
+    setMessages([]);
+    setChat(null);
+    setTypingUser(null);
+
     const loadChat = async () => {
       try {
         const [chatRes, messagesRes] = await Promise.all([
@@ -417,7 +422,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
               )}
               <ChatBubble
                 message={msg}
-                isOwn={user?.role !== 'customer' ? msg.senderRole !== 'customer' : msg.senderId?.toString() === user?._id?.toString()}
+                isOwn={user?.role === 'customer' ? msg.senderRole === 'customer' : msg.senderRole !== 'customer'}
                 viewerRole={user?.role}
                 onDelete={user?.role !== 'customer' ? handleDeleteMessage : null}
                 onImageClick={setZoomedImage}

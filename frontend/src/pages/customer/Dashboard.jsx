@@ -185,11 +185,13 @@ const CustomerDashboard = () => {
       if (pendingPrefilledMessageRef.current) {
         sendMessage({
           chatId: data.chatId,
-          content: "Sir, I need a manual ID. / सर, मुझे मैन्युअल आईडी चाहिए।",
+          content: typeof pendingPrefilledMessageRef.current === 'string'
+            ? pendingPrefilledMessageRef.current
+            : "Sir, I need a manual ID. / सर, मुझे मैन्युअल आईडी चाहिए।",
           type: 'text',
           isInternal: false
         });
-        pendingPrefilledMessageRef.current = false;
+        pendingPrefilledMessageRef.current = null;
       }
     };
     const handleChatClosed = (data) => { loadChats(); };
@@ -273,6 +275,12 @@ const CustomerDashboard = () => {
   };
 
   const handleIssueSelect = (issueType) => {
+    const welcomeMessages = {
+      deposit: 'Hello sir, I have a deposit issue. My payment is not reflecting in my account.',
+      withdrawal: 'Hello sir, I have a withdrawal issue. My withdrawal is pending/failed.',
+      other: 'Hello sir, I need support.'
+    };
+    pendingPrefilledMessageRef.current = welcomeMessages[issueType] || 'Hello sir';
     setSelectedIssueKey(issueType);
     setStartingChat(true);
     startChat(issueType);
@@ -285,7 +293,7 @@ const CustomerDashboard = () => {
 
   const handleManualIdStart = () => {
     if (!isConnected) { alert('Connecting to server, please wait...'); return; }
-    pendingPrefilledMessageRef.current = true;
+    pendingPrefilledMessageRef.current = "Sir, I need a manual ID. / सर, मुझे मैन्युअल आईडी चाहिए।";
     setStartingChat(true);
     startChat('new_id');
   };

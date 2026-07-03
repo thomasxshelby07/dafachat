@@ -695,44 +695,22 @@ io.on('connection', async (socket) => {
             }
           }
 
-          // Auto-send first message from customer if brand new chat OR if issue type changed
+          // Auto-send welcome message from agent if brand new chat OR if issue type changed
           const messagesCount = await Message.countDocuments({ chatId: freshChat._id });
           if (messagesCount === 0 || issueTypeChanged) {
-            const welcomeMessages = {
-              deposit: 'Hello, I have a deposit issue. My payment is not reflecting in my account.',
-              withdrawal: 'Hello, I have a withdrawal issue. My withdrawal is pending/failed.',
-              other: 'Hello, I need help with my account.',
-              new_id: 'Hello, I want to register for a new ID.',
-            };
-            const autoMsg = welcomeMessages[issueType] || welcomeMessages.other;
-
-            const firstMessage = new Message({
-              chatId: freshChat._id,
-              senderId: userId,
-              senderRole: 'customer',
-              senderName: socket.user.fullName || '',
-              content: autoMsg,
-              type: 'text',
-              status: 'sent',
-            });
-            await firstMessage.save();
-            await Chat.findByIdAndUpdate(freshChat._id, { lastMessageAt: new Date() });
-
-            const messageObj = firstMessage.toObject();
-            messageObj.senderName = socket.user.fullName;
-
             // Load welcome message setting for this category
+            const welcomeMessages = {
+              deposit: 'Welcome! Please share a screenshot of your transaction and your registered number so we can process your deposit quickly.',
+              withdrawal: 'Welcome! Please share your gaming ID and registered mobile number so we can check your withdrawal status.',
+              new_id: 'Welcome! How can we help you create a new DAFAXBET account? Please share your name and mobile number.',
+              other: 'Welcome to DAFAXBET Support. How can we help you today?',
+            };
+
             const settingKey = `welcome_message_${issueType}`;
             let welcomeSetting = await Settings.findOne({ key: settingKey });
             let welcomeText = welcomeSetting?.value;
             if (!welcomeText) {
-              const defaults = {
-                deposit: 'Welcome! Please share a screenshot of your transaction and your registered number so we can process your deposit quickly.',
-                withdrawal: 'Welcome! Please share your gaming ID and registered mobile number so we can check your withdrawal status.',
-                new_id: 'Welcome! How can we help you create a new DAFAXBET account? Please share your name and mobile number.',
-                other: 'Welcome to DAFAXBET Support. How can we help you today?',
-              };
-              welcomeText = defaults[issueType] || defaults.other;
+              welcomeText = welcomeMessages[issueType] || welcomeMessages.other;
             }
 
             const agent = freshChat.agentId ? await User.findById(freshChat.agentId) : null;
@@ -746,6 +724,7 @@ io.on('connection', async (socket) => {
               status: 'sent',
             });
             await welcomeMsg.save();
+            await Chat.findByIdAndUpdate(freshChat._id, { lastMessageAt: new Date() });
 
             const welcomeMsgObj = welcomeMsg.toObject();
             welcomeMsgObj.senderName = agent ? agent.fullName : 'Support Agent';
@@ -755,12 +734,10 @@ io.on('connection', async (socket) => {
             for (const staff of allStaff) {
               const staffSocket = userSocketMap[staff._id.toString()];
               if (staffSocket) {
-                io.to(staffSocket).emit('new_message', messageObj);
                 io.to(staffSocket).emit('new_message', welcomeMsgObj);
               }
             }
             // Send back to customer
-            io.to(socket.id).emit('new_message', messageObj);
             io.to(socket.id).emit('new_message', welcomeMsgObj);
           }
         } catch (error) {

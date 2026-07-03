@@ -28,28 +28,30 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
 
   const renderStatus = (status) => {
     if (!isOwn) return null;
+    const colorClass = isOwn ? 'text-white/60' : 'text-text-3';
+    const readColorClass = isOwn ? 'text-white' : 'text-primary';
 
     return (
       <span className="ml-1 flex items-center shrink-0">
         {status === 'sending' && (
-          <svg className="animate-spin h-3 w-3 text-text-3 opacity-60" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+          <svg className={`animate-spin h-3 w-3 ${colorClass} opacity-60`} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
             <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
             <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
           </svg>
         )}
         {status === 'sent' && (
-          <svg className="inline h-3.5 w-3.5 text-text-3" viewBox="0 0 16 15" fill="currentColor">
+          <svg className={`inline h-3.5 w-3.5 ${colorClass}`} viewBox="0 0 16 15" fill="currentColor">
             <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.033l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.05a.365.365 0 0 0-.064-.512z" />
           </svg>
         )}
         {status === 'delivered' && (
-          <svg className="inline h-3.5 w-3.5 text-text-3" viewBox="0 0 16 15" fill="currentColor">
+          <svg className={`inline h-3.5 w-3.5 ${colorClass}`} viewBox="0 0 16 15" fill="currentColor">
             <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.033l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.05a.365.365 0 0 0-.064-.512z" />
             <path d="M10.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L3.666 9.88a.32.32 0 0 1-.484.033L2.158 9.04a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l2.55 2.393a.32.32 0 0 0 .484-.034l6.272-8.05a.365.365 0 0 0-.064-.512z" />
           </svg>
         )}
         {status === 'read' && (
-          <svg className="inline h-3.5 w-3.5 text-primary" viewBox="0 0 16 15" fill="currentColor">
+          <svg className={`inline h-3.5 w-3.5 ${readColorClass}`} viewBox="0 0 16 15" fill="currentColor">
             <path d="M15.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L8.666 9.88a.32.32 0 0 1-.484.033l-.358-.325a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l1.32 1.267a.32.32 0 0 0 .484-.034l6.272-8.05a.365.365 0 0 0-.064-.512z" />
             <path d="M10.01 3.316l-.478-.372a.365.365 0 0 0-.51.063L3.666 9.88a.32.32 0 0 1-.484.033L2.158 9.04a.32.32 0 0 0-.484.032l-.378.48a.418.418 0 0 0 .036.54l2.55 2.393a.32.32 0 0 0 .484-.034l6.272-8.05a.365.365 0 0 0-.064-.512z" />
           </svg>
@@ -288,12 +290,13 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
       <div className="relative max-w-[80%]">
         <div
           className={`
-            px-2.5 py-1.5
+            px-3.5 py-2
             ${isOwn
-              ? 'bg-bubble-agent text-bubble-agent-text rounded-lg rounded-br-sm'
-              : 'bg-bubble-customer text-bubble-customer-text border border-border rounded-lg rounded-bl-sm shadow-card'
+              ? 'text-white rounded-2xl rounded-tr-sm shadow-sm'
+              : 'bg-bubble-customer text-bubble-customer-text border border-border/80 rounded-2xl rounded-tl-sm shadow-sm'
             }
           `}
+          style={isOwn ? { backgroundColor: 'var(--primary)' } : {}}
         >
           {renderMedia()}
           {message.senderRole && viewerRole !== 'customer' && message.senderRole !== 'customer' && (
@@ -316,7 +319,7 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
             </div>
           )}
           <div className={`flex items-center gap-0.5 mt-0.5 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-            <span className="text-[10px] text-text-3">
+            <span className={`text-[9px] ${isOwn ? 'text-white/70 font-semibold' : 'text-text-3'}`}>
               {formatTime(message.createdAt)}
             </span>
             {renderStatus(message.status)}

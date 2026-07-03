@@ -7,10 +7,15 @@ const Chat = require('../models/Chat');
 
 const router = express.Router();
 
+const sanitizeConfigValue = (val) => {
+  if (!val) return val;
+  return val.trim().replace(/^["']|["']$/g, '');
+};
+
 cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
+  cloud_name: sanitizeConfigValue(process.env.CLOUDINARY_CLOUD_NAME),
+  api_key: sanitizeConfigValue(process.env.CLOUDINARY_API_KEY),
+  api_secret: sanitizeConfigValue(process.env.CLOUDINARY_API_SECRET),
 });
 
 const storage = multer.memoryStorage();
