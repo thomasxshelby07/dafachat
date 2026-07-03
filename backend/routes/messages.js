@@ -4,6 +4,7 @@ const cloudinary = require('cloudinary').v2;
 const auth = require('../middleware/auth');
 const Message = require('../models/Message');
 const Chat = require('../models/Chat');
+const logger = require('../utils/logger');
 
 const router = express.Router();
 
