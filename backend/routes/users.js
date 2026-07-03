@@ -395,6 +395,80 @@ router.patch('/:id/permissions', auth, isManagerOrAbove, async (req, res) => {
   }
 });
 
+// POST /bulk-delete — Delete multiple users (and all associated data if customer)
+router.post('/bulk-delete', auth, isAdmin, async (req, res) => {
+  try {
+    const { userIds } = req.body;
+    if (!Array.isArray(userIds) || userIds.length === 0) {
+      return res.status(400).json({ error: 'Invalid userIds' });
+    }
+
+    const Customer = require('../models/Customer');
+    const Chat = require('../models/Chat');
+    const Lead = require('../models/Lead');
+    const Message = require('../models/Message');
+
+    const users = await User.find({ _id: { $in: userIds } });
+    const skippedSuperAdmins = [];
+    const processedUserIds = [];
+
+    for (const targetUser of users) {
+      if (targetUser.role === 'super_admin') {
+        skippedSuperAdmins.push(targetUser.fullName);
+        continue;
+      }
+
+      // If it's a customer, clean up all associated data
+      if (targetUser.role === 'customer') {
+        const customer = await Customer.findOne({ userId: targetUser._id });
+        if (customer) {
+          const chats = await Chat.find({ customerId: customer._id });
+          const chatIds = chats.map(c => c._id);
+
+          // Delete messages in customer chats
+          await Message.deleteMany({ chatId: { $in: chatIds } });
+
+          // Delete chats
+          await Chat.deleteMany({ customerId: customer._id });
+
+          // Delete leads
+          await Lead.deleteMany({ customerId: customer._id });
+
+          // Delete customer record
+          await Customer.deleteOne({ _id: customer._id });
+        }
+      } else if (targetUser.role === 'agent' || targetUser.role === 'manager') {
+        // Unassign this agent/manager from chats and leads
+        await Chat.updateMany({ agentId: targetUser._id }, { $unset: { agentId: "" } });
+        await Lead.updateMany({ assignedAgent: targetUser._id }, { $unset: { assignedAgent: "" }, $pull: { assignedAgents: targetUser._id } });
+        await Customer.updateMany({ assignedAgent: targetUser._id }, { $unset: { assignedAgent: "" } });
+      }
+
+      await User.deleteOne({ _id: targetUser._id });
+      processedUserIds.push(targetUser._id);
+
+      await AuditLog.create({
+        userId: req.user._id,
+        action: 'delete_user_bulk',
+        entity: 'user',
+        entityId: targetUser._id,
+        before: targetUser.toObject(),
+        ip: req.ip,
+      });
+    }
+
+    res.json({
+      message: `Successfully deleted ${processedUserIds.length} users.`,
+      deletedCount: processedUserIds.length,
+      skippedCount: skippedSuperAdmins.length,
+      skippedNames: skippedSuperAdmins
+    });
+  } catch (error) {
+    console.error('Bulk delete user error:', error);
+    res.status(500).json({ error: 'Failed to delete users' });
+  }
+});
+
 // DELETE /:id — Delete a user (and all associated data if customer)
 router.delete('/:id', auth, isAdmin, async (req, res) => {
   try {

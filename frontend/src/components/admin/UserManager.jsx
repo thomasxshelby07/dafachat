@@ -20,18 +20,21 @@ const UserManager = ({ initialFilter = '' }) => {
   const [editingPerms, setEditingPerms] = useState(null);
   const [permForm, setPermForm] = useState({});
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [selectedUserIds, setSelectedUserIds] = useState([]);
 
   useEffect(() => {
     setFilter(initialFilter || '');
     setFormData({ fullName: '', mobile: '', email: '', password: '', avatar: '' });
     setShowForm(false);
     setEditingPerms(null);
+    setSelectedUserIds([]);
   }, [initialFilter]);
 
   useEffect(() => { loadUsers(); }, [filter]);
 
   const loadUsers = async () => {
     setLoading(true);
+    setSelectedUserIds([]);
     try {
       const params = filter ? `?role=${filter}` : '';
       const res = await api.get(`/api/users${params}`);
@@ -91,6 +94,17 @@ const UserManager = ({ initialFilter = '' }) => {
       loadUsers();
     } catch (error) {
       alert(error.response?.data?.error || 'Failed to delete user');
+    }
+  };
+
+  const handleDeleteMultiple = async () => {
+    if (!window.confirm(`Delete ${selectedUserIds.length} selected users? This cannot be undone.`)) return;
+    try {
+      await api.post('/api/users/bulk-delete', { userIds: selectedUserIds });
+      setSelectedUserIds([]);
+      loadUsers();
+    } catch (error) {
+      alert(error.response?.data?.error || 'Failed to delete selected users');
     }
   };
 
@@ -250,24 +264,56 @@ const UserManager = ({ initialFilter = '' }) => {
       )}
 
       <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-xs">
-            <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input
-              type="text"
-              placeholder="Search by name or phone..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-lg text-sm placeholder-text-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
-            />
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3 flex-1">
+            <div className="relative flex-1 max-w-xs min-w-[200px]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <input
+                type="text"
+                placeholder="Search by name or phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-9 pr-3 py-2 bg-bg border border-border rounded-lg text-sm placeholder-text-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary"
+              />
+            </div>
+            <div className="flex gap-2 flex-wrap">
+              {['', 'customer', 'agent', 'manager', 'super_admin'].map((role) => (
+                <button key={role} onClick={() => { setFilter(role); setSelectedUserIds([]); }} className={`px-3 py-1.5 rounded-pill text-xs font-medium transition-colors ${filter === role ? 'bg-primary text-white' : 'bg-bg text-text-2 hover:text-text-1'}`}>
+                  {role ? role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'All'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex gap-2 flex-wrap">
-            {['', 'customer', 'agent', 'manager', 'super_admin'].map((role) => (
-              <button key={role} onClick={() => setFilter(role)} className={`px-3 py-1.5 rounded-pill text-xs font-medium transition-colors ${filter === role ? 'bg-primary text-white' : 'bg-bg text-text-2 hover:text-text-1'}`}>
-                {role ? role.replace('_', ' ').replace(/\b\w/g, l => l.toUpperCase()) : 'All'}
-              </button>
-            ))}
-          </div>
+
+          {user?.role === 'super_admin' && filteredUsers.some(u => u.role !== 'super_admin') && (
+            <div className="flex items-center gap-3">
+              <label className="flex items-center gap-1.5 text-xs text-text-2 font-medium cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={filteredUsers.filter(u => u.role !== 'super_admin').length > 0 && filteredUsers.filter(u => u.role !== 'super_admin').every(u => selectedUserIds.includes(u._id))}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      const deletable = filteredUsers.filter(u => u.role !== 'super_admin').map(u => u._id);
+                      setSelectedUserIds(deletable);
+                    } else {
+                      setSelectedUserIds([]);
+                    }
+                  }}
+                  className="rounded border-border text-primary focus:ring-primary h-4 w-4 cursor-pointer"
+                />
+                Select All
+              </label>
+
+              {selectedUserIds.length > 0 && (
+                <button
+                  onClick={handleDeleteMultiple}
+                  className="px-3 py-1.5 bg-danger text-white rounded text-xs font-semibold hover:bg-danger/90 active:scale-95 transition-all"
+                >
+                  Delete Selected ({selectedUserIds.length})
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -280,6 +326,20 @@ const UserManager = ({ initialFilter = '' }) => {
           filteredUsers.map((u) => (
             <div key={u._id} className="p-4">
               <div className="flex items-center gap-4">
+                {user?.role === 'super_admin' && u.role !== 'super_admin' && (
+                  <input
+                    type="checkbox"
+                    checked={selectedUserIds.includes(u._id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedUserIds(prev => [...prev, u._id]);
+                      } else {
+                        setSelectedUserIds(prev => prev.filter(id => id !== u._id));
+                      }
+                    }}
+                    className="rounded border-border text-primary focus:ring-primary h-4 w-4 mr-1 cursor-pointer select-none"
+                  />
+                )}
                 {u.avatar ? (
                   <img src={u.avatar} alt={u.fullName} className="w-10 h-10 object-cover border border-border flex-shrink-0" />
                 ) : (

@@ -81,8 +81,41 @@ customerSchema.index({ dafaxbetId: 1 }, { unique: true, sparse: true });
 
 customerSchema.pre('save', async function (next) {
   if (!this.customerId) {
-    const count = await mongoose.model('Customer').countDocuments();
-    this.customerId = `DAF-${String(count + 10001).padStart(5, '0')}`;
+    try {
+      const lastCustomer = await mongoose.model('Customer')
+        .findOne({ customerId: { $regex: /^DAF-\d+$/ } })
+        .sort({ customerId: -1 })
+        .exec();
+
+      let nextNum = 10001;
+      if (lastCustomer && lastCustomer.customerId) {
+        const match = lastCustomer.customerId.match(/\d+/);
+        if (match) {
+          nextNum = parseInt(match[0], 10) + 1;
+        }
+      }
+
+      let unique = false;
+      let attempts = 0;
+      while (!unique && attempts < 10) {
+        const candidateId = `DAF-${String(nextNum).padStart(5, '0')}`;
+        const existing = await mongoose.model('Customer').findOne({ customerId: candidateId });
+        if (!existing) {
+          this.customerId = candidateId;
+          unique = true;
+        } else {
+          nextNum++;
+          attempts++;
+        }
+      }
+
+      if (!unique) {
+        this.customerId = `DAF-${Date.now()}`;
+      }
+    } catch (err) {
+      // Fallback in case of database query errors
+      this.customerId = `DAF-${Date.now()}`;
+    }
   }
   next();
 });
