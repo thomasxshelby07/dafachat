@@ -115,6 +115,46 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// GET /unread-count - Lightweight endpoint to fetch total unread count for the user
+router.get('/unread-count', auth, async (req, res) => {
+  try {
+    let customerId;
+    if (req.user.role === 'customer') {
+      const customer = await Customer.findOne({ userId: req.user._id });
+      if (!customer) return res.json({ unreadCount: 0 });
+      customerId = customer._id;
+    }
+
+    const chatQuery = { status: 'active' };
+    if (req.user.role === 'customer') {
+      chatQuery.customerId = customerId;
+    } else if (req.user.role === 'agent') {
+      chatQuery.agentId = req.user._id;
+    }
+
+    const chats = await Chat.find(chatQuery).select('_id');
+    const chatIds = chats.map(c => c._id);
+    if (chatIds.length === 0) {
+      return res.json({ unreadCount: 0 });
+    }
+
+    const unreadQuery = {
+      chatId: { $in: chatIds },
+      senderId: { $ne: req.user._id },
+      status: { $ne: 'read' },
+    };
+
+    if (req.user.role === 'customer') {
+      unreadQuery.isInternal = { $ne: true };
+    }
+
+    const count = await Message.countDocuments(unreadQuery);
+    res.json({ unreadCount: count });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch unread count' });
+  }
+});
+
 router.get('/:id', auth, async (req, res) => {
   try {
     const chat = await Chat.findById(req.params.id)

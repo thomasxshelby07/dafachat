@@ -40,14 +40,10 @@ const WidgetDemo = () => {
         return;
       }
       try {
-        const res = await api.get('/api/chats', {
+        const res = await api.get('/api/chats/unread-count', {
           headers: { Authorization: `Bearer ${token}` }
         });
-        const chatsList = res.data.chats || [];
-        const totalUnread = chatsList
-          .filter(c => c.status === 'active')
-          .reduce((sum, c) => sum + (c.unreadCount || 0), 0);
-        setUnreadCount(totalUnread);
+        setUnreadCount(res.data.unreadCount || 0);
       } catch (err) {
         console.error('Failed to fetch unread count:', err);
         if (err.response?.status === 401) {
