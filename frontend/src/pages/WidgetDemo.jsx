@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import api from '../hooks/api';
 
 const WidgetDemo = () => {
@@ -12,6 +12,7 @@ const WidgetDemo = () => {
   });
 
   const [unreadCount, setUnreadCount] = useState(0);
+  const iframeRef = useRef(null);
 
   useEffect(() => {
     // Load public branding settings to match colors
@@ -26,6 +27,24 @@ const WidgetDemo = () => {
       })
       .catch((err) => console.error('Failed to load branding:', err));
   }, []);
+
+  useEffect(() => {
+    // Listen for unread count updates from iframe customer app
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'UPDATE_UNREAD_COUNT') {
+        setUnreadCount(event.data.count || 0);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
+
+  useEffect(() => {
+    // Post widget open/close state to the iframe
+    if (iframeRef.current && iframeRef.current.contentWindow) {
+      iframeRef.current.contentWindow.postMessage({ type: 'WIDGET_OPEN_STATE', isOpen }, '*');
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (isOpen) {
@@ -172,66 +191,66 @@ const WidgetDemo = () => {
       </main>
 
       {/* Embedded Bot Widget Iframe Modal overlay */}
-      {isOpen && (
+      <div 
+        className={isFullscreen 
+          ? "fixed inset-0 z-50 p-0 sm:p-4 bg-black/75 flex flex-col justify-center items-center pointer-events-auto transition-all duration-300"
+          : "fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-[385px] h-[88%] sm:h-[620px] bg-transparent z-50 transition-all duration-300 ease-out p-0 sm:p-2 flex flex-col justify-end pointer-events-auto"
+        }
+        style={{ display: isOpen ? 'flex' : 'none' }}
+      >
+        {/* Main Iframe Card container */}
         <div 
-          className={isFullscreen 
-            ? "fixed inset-0 z-50 p-0 sm:p-4 bg-black/75 flex flex-col justify-center items-center pointer-events-auto transition-all duration-300"
-            : "fixed bottom-0 right-0 sm:bottom-6 sm:right-6 w-full sm:w-[385px] h-[88%] sm:h-[620px] bg-transparent z-50 transition-all duration-300 ease-out p-0 sm:p-2 flex flex-col justify-end pointer-events-auto"
+          className={isFullscreen
+            ? "w-full h-full sm:max-w-5xl sm:max-h-[85vh] bg-[#0f172a] border border-[#1e293b] shadow-2xl flex flex-col overflow-hidden sm:rounded-3xl relative animate-scale-in"
+            : "w-full h-full bg-[#0f172a] border border-[#1e293b] shadow-2xl flex flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl relative animate-slide-up"
           }
         >
-          {/* Main Iframe Card container */}
-          <div 
-            className={isFullscreen
-              ? "w-full h-full sm:max-w-5xl sm:max-h-[85vh] bg-[#0f172a] border border-[#1e293b] shadow-2xl flex flex-col overflow-hidden sm:rounded-3xl relative animate-scale-in"
-              : "w-full h-full bg-[#0f172a] border border-[#1e293b] shadow-2xl flex flex-col overflow-hidden rounded-t-3xl sm:rounded-3xl relative animate-slide-up"
-            }
-          >
-            {/* Top Widget Close Bar */}
-            <div className="h-11 bg-[#111827] px-4 border-b border-[#1e293b] flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Live Support Chat</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <button 
-                  onClick={() => setIsFullscreen(!isFullscreen)}
-                  className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-all cursor-pointer"
-                  title={isFullscreen ? "Restore Window" : "Maximize Window"}
-                >
-                  {isFullscreen ? (
-                    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 16l4-4m0 0l-4-4m4 4h12" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    </svg>
-                  )}
-                </button>
-                <button 
-                  onClick={() => setIsOpen(false)}
-                  className="text-slate-400 hover:text-white p-1.5 rounded hover:bg-slate-800 transition-all cursor-pointer"
-                  title="Minimize Chat"
-                >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-              </div>
+          {/* Top Widget Close Bar */}
+          <div className="h-11 bg-[#111827] px-4 border-b border-[#1e293b] flex items-center justify-between flex-shrink-0">
+            <div className="flex items-center gap-1.5">
+              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">Live Support Chat</span>
             </div>
-
-            {/* Embedded Customer Chat App */}
-            <div className="flex-1 w-full relative bg-[#0f172a] overflow-hidden">
-              <iframe 
-                src="/login?embed=true" 
-                title="Customer Support Chat"
-                className="absolute inset-0 w-full h-full border-none block"
-                allow="microphone; camera"
-              />
+            <div className="flex items-center gap-3">
+              <button 
+                onClick={() => setIsFullscreen(!isFullscreen)}
+                className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-all cursor-pointer"
+                title={isFullscreen ? "Restore Window" : "Maximize Window"}
+              >
+                {isFullscreen ? (
+                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1M4 16l4-4m0 0l-4-4m4 4h12" />
+                  </svg>
+                ) : (
+                  <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-5h-4m4 0v4m0-4l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                  </svg>
+                )}
+              </button>
+              <button 
+                onClick={() => setIsOpen(false)}
+                className="text-slate-400 hover:text-white p-1.5 rounded hover:bg-slate-800 transition-all cursor-pointer"
+                title="Minimize Chat"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
             </div>
           </div>
+
+          {/* Embedded Customer Chat App */}
+          <div className="flex-1 w-full relative bg-[#0f172a] overflow-hidden">
+            <iframe 
+              ref={iframeRef}
+              src="/login?embed=true" 
+              title="Customer Support Chat"
+              className="absolute inset-0 w-full h-full border-none block"
+              allow="microphone; camera"
+            />
+          </div>
         </div>
-      )}
+      </div>
 
       {/* Floating Chat Bubble Button */}
       {!isOpen && (

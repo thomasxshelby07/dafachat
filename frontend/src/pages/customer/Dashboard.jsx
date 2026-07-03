@@ -5,7 +5,7 @@ import { useSocket } from '../../hooks/useSocket';
 import api from '../../hooks/api';
 import ChatScreen from '../../components/chat/ChatScreen';
 import NotificationBell from '../../components/NotificationBell';
-import { requestNotificationPermission } from '../../utils/notifications';
+import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../../utils/notifications';
 import { useBranding } from '../../context/BrandingContext';
 
 const ISSUE_TYPES = [
@@ -73,6 +73,18 @@ const CustomerDashboard = () => {
   const [upgradedDafaId, setUpgradedDafaId] = useState(null);
   const [isExistingIdUpgrade, setIsExistingIdUpgrade] = useState(false);
   const pendingPrefilledMessageRef = useRef(false);
+
+  const [isWidgetOpen, setIsWidgetOpen] = useState(true);
+
+  useEffect(() => {
+    const handleMessage = (event) => {
+      if (event.data && event.data.type === 'WIDGET_OPEN_STATE') {
+        setIsWidgetOpen(event.data.isOpen);
+      }
+    };
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, []);
 
   useEffect(() => {
     if ('Notification' in window && Notification.permission !== 'granted') {
@@ -142,7 +154,12 @@ const CustomerDashboard = () => {
   const loadChats = async () => {
     try { 
       const res = await api.get('/api/chats'); 
-      setChats(res.data.chats); 
+      const chatList = res.data.chats || [];
+      setChats(chatList); 
+
+      // Send unreadCount update to the parent window if running inside iframe
+      const totalUnread = chatList.reduce((sum, c) => sum + (c.unreadCount || 0), 0);
+      window.parent.postMessage({ type: 'UPDATE_UNREAD_COUNT', count: totalUnread }, '*');
     }
     catch (error) { console.error('Failed to load chats:', error); }
     finally { setLoading(false); }
@@ -197,7 +214,21 @@ const CustomerDashboard = () => {
     const handleChatClosed = (data) => { loadChats(); };
     const handleAgentAssigned = () => loadChats();
     const handleAgentOnBreak = (data) => { setBreakAlert(data.message); setTimeout(() => setBreakAlert(null), 5000); };
-    const handleNewMessage = (message) => { if (message.isInternal) return; loadChats(); };
+    const handleNewMessage = (message) => { 
+      if (message.isInternal) return; 
+      loadChats(); 
+
+      if (message.senderId?.toString() !== user?._id?.toString()) {
+        playNotificationSound();
+
+        if (document.hidden || !isWidgetOpen) {
+          showBrowserNotification(branding.companyName ? `${branding.companyName.toUpperCase()} SUPPORT` : 'SUPPORT', {
+            body: message.content || 'Sent an attachment',
+            tag: message.chatId,
+          });
+        }
+      }
+    };
     const handleChatRead = (data) => { loadChats(); };
     const handleError = () => {
       setStartingChat(false);

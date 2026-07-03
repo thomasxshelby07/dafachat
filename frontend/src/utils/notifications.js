@@ -60,3 +60,32 @@ export const getPermissionStatus = () => {
   if (!('Notification' in window)) return 'unsupported';
   return Notification.permission;
 };
+
+export const playNotificationSound = () => {
+  try {
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    
+    const playTone = (freq, startTime, duration) => {
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, startTime);
+      
+      gain.gain.setValueAtTime(0.1, startTime);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+      
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      osc.start(startTime);
+      osc.stop(startTime + duration);
+    };
+
+    const now = audioCtx.currentTime;
+    playTone(523.25, now, 0.15); // C5
+    playTone(659.25, now + 0.15, 0.2); // E5
+  } catch (e) {
+    console.error('Failed to play notification sound:', e);
+  }
+};
