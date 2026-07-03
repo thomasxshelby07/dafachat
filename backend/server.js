@@ -908,22 +908,6 @@ const startServer = async () => {
     logger.error('Failed to clean empty dafaxbetId fields from database:', err);
   }
 
-  try {
-    const allSettings = await Settings.find();
-    for (const setting of allSettings) {
-      let settingStr = JSON.stringify(setting.value);
-      if (settingStr.includes('DAFAX')) {
-        settingStr = settingStr.replace(/DAFAX/g, 'DAFA');
-        setting.value = JSON.parse(settingStr);
-        setting.markModified('value');
-        await setting.save();
-        logger.info(`Corrected DAFAX to DAFA in settings database record for key: ${setting.key}`);
-      }
-    }
-  } catch (err) {
-    logger.error('Failed to correct seeded branding defaults in database:', err);
-  }
-
   // Auto-seed default banners and announcements if database is empty
   try {
     const bannerCount = await Banner.countDocuments();
