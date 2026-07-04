@@ -632,21 +632,12 @@ io.on('connection', async (socket) => {
             role: { $in: ['agent', 'manager', 'super_admin'] }
           };
 
-          if (issueType === 'new_id') {
-            categoryQuery.$or = [
-              { 'permissions.issueTypes': 'other' },
-              { 'permissions.issueTypes': { $size: 0 } },
-              { 'permissions.issueTypes': { $exists: false } },
-              { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } }
-            ];
-          } else {
-            categoryQuery.$or = [
-              { 'permissions.issueTypes': issueType },
-              { 'permissions.issueTypes': { $size: 0 } },
-              { 'permissions.issueTypes': { $exists: false } },
-              { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } }
-            ];
-          }
+          categoryQuery.$or = [
+            { 'permissions.issueTypes': issueType },
+            { 'permissions.issueTypes': { $size: 0 } },
+            { 'permissions.issueTypes': { $exists: false } },
+            { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } }
+          ];
 
           const candidates = await User.find(categoryQuery).select('_id fullName status permissions role');
           if (candidates.length > 0) {
