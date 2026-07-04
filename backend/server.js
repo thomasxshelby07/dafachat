@@ -607,30 +607,7 @@ io.on('connection', async (socket) => {
         }
 
         if (!agent) {
-          const categoryQuery = {
-            isActive: true,
-            status: 'online',
-            role: { $in: ['agent', 'manager', 'super_admin'] }
-          };
-
-          categoryQuery.$or = [
-            { 'permissions.issueTypes': issueType },
-            { 'permissions.issueTypes': { $size: 0 } },
-            { 'permissions.issueTypes': { $exists: false } },
-            { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } }
-          ];
-
-          const candidates = await User.find(categoryQuery).select('_id fullName status permissions role');
-          if (candidates.length > 0) {
-            const counts = await Promise.all(
-              candidates.map(async (cand) => {
-                const count = await Chat.countDocuments({ agentId: cand._id, status: 'active' });
-                return { cand, count };
-              })
-            );
-            counts.sort((a, b) => a.count - b.count);
-            agent = counts[0].cand;
-          }
+          agent = await findBestAgent(issueType);
         }
 
         if (agent) {
