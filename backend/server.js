@@ -324,6 +324,10 @@ io.on('connection', async (socket) => {
   await safeRedis.sadd(ONLINE_KEY, userId);
   io.emit('user_status', { userId, status: 'online' });
 
+  if (['agent', 'manager', 'super_admin'].includes(userRole)) {
+    socket.join('staff_room');
+  }
+
   socket.on('join_chat', (chatId) => {
     socket.join(chatId);
   });
@@ -371,18 +375,7 @@ io.on('connection', async (socket) => {
       }
 
       if (actualIsInternal) {
-        const staffInChat = await User.find({
-          _id: { $ne: userId },
-          role: { $in: ['agent', 'manager', 'super_admin'] },
-          isActive: true,
-        }).select('_id');
-
-        for (const staff of staffInChat) {
-          const staffSocket = userSocketMap[staff._id.toString()];
-          if (staffSocket) {
-            io.to(staffSocket).emit('new_message', messageObj);
-          }
-        }
+        socket.to('staff_room').emit('new_message', messageObj);
         const senderSocket = userSocketMap[userId];
         if (senderSocket) {
           io.to(senderSocket).emit('message_delivered', { messageId: message._id, chatId, message: messageObj });
@@ -450,18 +443,7 @@ io.on('connection', async (socket) => {
           await notifyCustomerNewMessage(chat, message, socket.user);
         }
 
-        const allStaff = await User.find({
-          role: { $in: ['agent', 'manager', 'super_admin'] },
-          isActive: true,
-          _id: { $ne: userId },
-        }).select('_id');
-
-        for (const staff of allStaff) {
-          const staffSocket = userSocketMap[staff._id.toString()];
-          if (staffSocket) {
-            io.to(staffSocket).emit('new_message', messageObj);
-          }
-        }
+        socket.to('staff_room').emit('new_message', messageObj);
       }
     } catch (error) {
       logger.error('Send message error:', error);
@@ -549,18 +531,7 @@ io.on('connection', async (socket) => {
       // Broadcast to chat room
       io.to(chatId).emit('message_read', { chatId, messageIds, readBy: userId });
 
-      // Broadcast to all staff for chat list unread count update
-      const allStaff = await User.find({
-        role: { $in: ['agent', 'manager', 'super_admin'] },
-        isActive: true,
-        _id: { $ne: userId },
-      }).select('_id');
-      for (const staff of allStaff) {
-        const staffSocket = userSocketMap[staff._id.toString()];
-        if (staffSocket) {
-          io.to(staffSocket).emit('message_read', { chatId, messageIds, readBy: userId });
-        }
-      }
+      socket.to('staff_room').emit('message_read', { chatId, messageIds, readBy: userId });
 
       // Notify customer if they sent those messages
       const chat = await Chat.findById(chatId);

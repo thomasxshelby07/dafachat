@@ -5,7 +5,7 @@ import api from '../../hooks/api';
 import ChatScreen from '../../components/chat/ChatScreen';
 import ChatList from '../../components/chat/ChatList';
 import NotificationBell from '../../components/NotificationBell';
-import { requestNotificationPermission } from '../../utils/notifications';
+import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../../utils/notifications';
 import useIdleTimer from '../../hooks/useIdleTimer';
 
 const ISSUE_LABELS = { deposit: '💳 Deposit', withdrawal: '💸 Withdrawal', other: '💬 General' };
@@ -128,6 +128,17 @@ const AgentDashboard = () => {
         return updated;
       });
       setActiveChat(prev => prev && prev._id === message.chatId ? { ...prev, lastMessageAt: message.createdAt, lastMessage: { content: message.content } } : prev);
+
+      // Trigger real-time sound and desktop notification for agent
+      if (message.senderId?.toString() !== user?._id?.toString()) {
+        playNotificationSound();
+        if (document.hidden || activeChatRef.current?._id !== message.chatId) {
+          showBrowserNotification(message.senderName || 'New Client Message', {
+            body: message.content || 'Sent an attachment',
+            tag: message.chatId,
+          });
+        }
+      }
     };
     const handleAgentStatusChanged = (data) => { 
       setChats(prev => prev.map(c => c.agentId?._id === data.userId ? { ...c, agentId: { ...c.agentId, status: data.status } } : c)); 
