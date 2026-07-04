@@ -593,7 +593,18 @@ io.on('connection', async (socket) => {
         return socket.emit('error', { message: 'Failed to initialize chat' });
       }
 
-      if (!freshChat.agentId || issueTypeChanged || fallbackAgentId) {
+      let agentSpecializes = false;
+      if (freshChat.agentId) {
+        const currentAgent = await User.findById(freshChat.agentId);
+        if (currentAgent) {
+          const types = currentAgent.permissions?.issueTypes || [];
+          if (types.length === 0 || types.includes(issueType)) {
+            agentSpecializes = true;
+          }
+        }
+      }
+
+      if (!freshChat.agentId || issueTypeChanged || !agentSpecializes || fallbackAgentId) {
         const oldAgentId = freshChat.agentId;
         let agent = null;
 
@@ -733,13 +744,7 @@ io.on('connection', async (socket) => {
         welcomeMsgObj.senderName = agent ? agent.fullName : 'Support Agent';
 
         // Send to all staff
-        const allStaff = await User.find({ role: { $in: ['agent', 'manager', 'super_admin'] }, isActive: true }).select('_id');
-        for (const staff of allStaff) {
-          const staffSocket = userSocketMap[staff._id.toString()];
-          if (staffSocket) {
-            io.to(staffSocket).emit('new_message', welcomeMsgObj);
-          }
-        }
+        io.to('staff_room').emit('new_message', welcomeMsgObj);
         // Send back to customer
         io.to(socket.id).emit('new_message', welcomeMsgObj);
       }
