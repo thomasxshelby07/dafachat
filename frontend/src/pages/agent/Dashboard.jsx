@@ -74,6 +74,11 @@ const AgentDashboard = () => {
   const chatsRef = useRef(chats);
   chatsRef.current = chats;
 
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
   const agentIssueTypes = user?.permissions?.issueTypes || [];
 
   const loadChats = async () => {
@@ -123,14 +128,24 @@ const AgentDashboard = () => {
         const idx = prev.findIndex(c => c._id === message.chatId);
         if (idx === -1) { loadChats(); return prev; }
         const updated = [...prev];
-        updated[idx] = { ...updated[idx], lastMessageAt: message.createdAt, lastMessage: { content: message.content }, unreadCount: message.senderId?.toString() !== user?._id?.toString() ? (updated[idx].unreadCount || 0) + 1 : updated[idx].unreadCount };
+        updated[idx] = { ...updated[idx], lastMessageAt: message.createdAt, lastMessage: { content: message.content }, unreadCount: message.senderRole === 'customer' ? (updated[idx].unreadCount || 0) + 1 : updated[idx].unreadCount };
         updated.sort((a, b) => new Date(b.lastMessageAt) - new Date(a.lastMessageAt));
         return updated;
       });
       setActiveChat(prev => prev && prev._id === message.chatId ? { ...prev, lastMessageAt: message.createdAt, lastMessage: { content: message.content } } : prev);
 
-      // Trigger real-time sound and desktop notification for agent
-      if (message.senderId?.toString() !== user?._id?.toString()) {
+      // Trigger real-time sound and desktop notification for agent ONLY if it is from the customer
+      // AND either assigned to me or unassigned in my category queue
+      const chatObj = chatsRef.current.find(c => c._id === message.chatId);
+      const isAssignedToMe = chatObj && (
+        (chatObj.agentId === userRef.current?._id) ||
+        (chatObj.agentId?._id === userRef.current?._id)
+      );
+      const isUnassignedSpecialist = chatObj && !chatObj.agentId && (
+        userRef.current?.permissions?.issueTypes?.includes(chatObj.issueType)
+      );
+
+      if (message.senderRole === 'customer' && (isAssignedToMe || isUnassignedSpecialist)) {
         playNotificationSound();
         if (document.hidden || activeChatRef.current?._id !== message.chatId) {
           showBrowserNotification(message.senderName || 'New Client Message', {
