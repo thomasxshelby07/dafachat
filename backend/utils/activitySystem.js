@@ -342,14 +342,18 @@ async function reassignLead(leadId, oldAgent, io) {
     let newAgent = null;
     const category = lead.issueType || 'other';
 
-    // Helper query constructor for issueTypes match (matches category, empty array, or empty key)
-    const buildCategoryQuery = (cat) => ({
-      $or: [
-        { 'permissions.issueTypes': cat },
-        { 'permissions.issueTypes': { $size: 0 } },
-        { 'permissions.issueTypes': { $exists: false } }
-      ]
-    });
+    const buildCategoryQuery = (cat) => {
+      if (cat === 'new_id' || cat === 'verify_id') {
+        return { 'permissions.issueTypes': cat };
+      }
+      return {
+        $or: [
+          { 'permissions.issueTypes': cat },
+          { 'permissions.issueTypes': { $size: 0 } },
+          { 'permissions.issueTypes': { $exists: false } }
+        ]
+      };
+    };
 
     // Priority 1: Same Category + Same Team Active Agent
     if (oldAgent.team) {

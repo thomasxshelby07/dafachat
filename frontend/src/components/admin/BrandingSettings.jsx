@@ -27,6 +27,7 @@ const BrandingSettings = () => {
     welcome_message_deposit: '',
     welcome_message_withdrawal: '',
     welcome_message_new_id: '',
+    welcome_message_verify_id: '',
     welcome_message_other: '',
     faqs: [],
   });
@@ -504,6 +505,17 @@ const BrandingSettings = () => {
                     rows={2}
                     className="input-field w-full"
                     placeholder="Enter automated message for New ID chats..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-text-1 mb-1.5">Verify ID Welcome Message</label>
+                  <textarea
+                    value={settings.welcome_message_verify_id || ''}
+                    onChange={(e) => handleChange('welcome_message_verify_id', e.target.value)}
+                    rows={2}
+                    className="input-field w-full"
+                    placeholder="Enter automated message for Verify ID chats..."
                   />
                 </div>
 

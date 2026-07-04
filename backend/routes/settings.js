@@ -38,6 +38,7 @@ const defaultSettings = {
     welcome_message_deposit: 'Welcome! Please share a screenshot of your transaction and your registered number so we can process your deposit quickly.',
     welcome_message_withdrawal: 'Welcome! Please share your gaming ID and registered mobile number so we can check your withdrawal status.',
     welcome_message_new_id: 'Welcome! How can we help you create a new DAFAXBET account? Please share your name and mobile number.',
+    welcome_message_verify_id: 'Welcome! Please share your registered mobile number and Dafa ID for quick verification.',
     welcome_message_other: 'Welcome to DAFAXBET Support. How can we help you today.',
     faqs: [
       { q: 'How do I make a deposit?', a: 'Click the "Play Now" button in the header, go to the deposit section, choose your payment method, and complete the transfer. If it does not reflect, start a "Deposit Issue" support chat.' },

@@ -82,7 +82,7 @@ const userSchema = new mongoose.Schema({
     canManageBranding: { type: Boolean, default: false },
     issueTypes: [{
       type: String,
-      enum: ['deposit', 'withdrawal', 'other', 'new_id'],
+      enum: ['deposit', 'withdrawal', 'other', 'new_id', 'verify_id'],
     }],
   },
   avatar: {

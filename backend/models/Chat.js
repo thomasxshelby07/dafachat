@@ -16,7 +16,7 @@ const chatSchema = new mongoose.Schema({
   },
   issueType: {
     type: String,
-    enum: ['deposit', 'withdrawal', 'other', 'new_id'],
+    enum: ['deposit', 'withdrawal', 'other', 'new_id', 'verify_id'],
     default: 'other',
   },
   status: {

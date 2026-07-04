@@ -369,10 +369,14 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
               <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-medium ${
                 chat.issueType === 'deposit' ? 'bg-info/10 text-info' :
                 chat.issueType === 'withdrawal' ? 'bg-warning/10 text-warning' :
+                chat.issueType === 'new_id' ? 'bg-emerald-500/10 text-emerald-500' :
+                chat.issueType === 'verify_id' ? 'bg-indigo-500/10 text-indigo-500' :
                 'bg-text-3/10 text-text-2'
               }`}>
                 {chat.issueType === 'deposit' ? '💳 Deposit' :
                  chat.issueType === 'withdrawal' ? '💸 Withdrawal' :
+                 chat.issueType === 'new_id' ? '🆕 New ID' :
+                 chat.issueType === 'verify_id' ? '🔍 Verify ID' :
                  '💬 General'}
               </span>
             </div>

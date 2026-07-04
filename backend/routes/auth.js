@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Customer = require('../models/Customer');
 const Lead = require('../models/Lead');
+const Chat = require('../models/Chat');
+const Message = require('../models/Message');
 const auth = require('../middleware/auth');
 const { validate, registerSchema, loginSchema } = require('../middleware/validate');
 const logger = require('../utils/logger');
@@ -92,6 +94,67 @@ const autoAssignNewIdAgent = async (lead, customer, io) => {
     }
   } catch (err) {
     logger.error('Failed to auto-assign new_id agent:', err);
+  }
+};
+
+const autoAssignVerifyIdAgent = async (lead, customer, io) => {
+  try {
+    const Chat = require('../models/Chat');
+    
+    // Find active online users specializing in 'verify_id'
+    const candidates = await User.find({
+      isActive: true,
+      status: 'online',
+      role: { $in: ['agent', 'manager', 'super_admin'] },
+      'permissions.issueTypes': 'verify_id',
+    });
+
+    if (candidates.length > 0) {
+      // Balance load by selecting candidate with least active chats
+      let bestAgent = candidates[0];
+      let minCount = Infinity;
+      for (const cand of candidates) {
+        const count = await Chat.countDocuments({ agentId: cand._id, status: 'active' });
+        if (count < minCount) {
+          minCount = count;
+          bestAgent = cand;
+        }
+      }
+      
+      // Assign agent to lead
+      lead.assignedAgent = bestAgent._id;
+      lead.assignedAgents = [bestAgent._id];
+      lead.status = 'assigned';
+      lead.timeline.push({
+        event: `Auto-assigned to ${bestAgent.fullName} (ID Verification Specialist) on registration`,
+        date: new Date(),
+        by: bestAgent._id,
+      });
+
+      // Assign agent to customer
+      customer.assignedAgent = bestAgent._id;
+      customer.leadStatus = 'assigned';
+
+      // Emit new chat assignment to agent in real-time
+      if (io) {
+        const { getSocketId } = require('../server');
+        const agentSocketId = await getSocketId(bestAgent._id.toString());
+        if (agentSocketId) {
+          io.to(agentSocketId).emit('new_chat_assigned', {
+            chatId: lead.chatId || null,
+            customer: customer.toObject ? customer.toObject() : customer,
+            issueType: 'verify_id',
+            message: `${customer.fullName} needs help (ID verification)`,
+          });
+        }
+      }
+    }
+
+    if (io) {
+      io.emit('new_lead', { lead: lead.toObject ? lead.toObject() : lead });
+    }
+  } catch (err) {
+    logger.error('Failed to auto-assign verify_id agent:', err);
   }
 };
 
@@ -827,7 +890,7 @@ router.post('/customer-verify', async (req, res) => {
         lead = new Lead({
           customerId: customer._id,
           status: 'verification_pending',
-          issueType: 'new_id', // Connect to New ID Team
+          issueType: 'verify_id', // Connect to Verify ID Team
           requestedDafaId: cleanDafaId,
           timeline: [{
             event: `Customer requested verification for Dafa ID: ${cleanDafaId}`,
@@ -836,7 +899,7 @@ router.post('/customer-verify', async (req, res) => {
           }],
         });
         const io = req.app.get('io');
-        await autoAssignNewIdAgent(lead, customer, io);
+        await autoAssignVerifyIdAgent(lead, customer, io);
         await lead.save();
         await customer.save();
       }
@@ -861,16 +924,13 @@ router.post('/customer-verify', async (req, res) => {
         await lead.save();
       }
 
-      // Ensure an active Chat document is created for this verification request!
-      const Chat = require('../models/Chat');
-      const Message = require('../models/Message');
       let chat = await Chat.findOne({ customerId: customer._id, status: 'active' });
       if (!chat) {
         chat = new Chat({
           customerId: customer._id,
           agentId: lead.assignedAgent || null,
           status: 'active',
-          issueType: 'new_id',
+          issueType: 'verify_id',
         });
         await chat.save();
         
@@ -947,7 +1007,7 @@ router.post('/customer-verify', async (req, res) => {
     const lead = new Lead({
       customerId: newCustomer._id,
       status: 'verification_pending',
-      issueType: 'new_id', // Connects to New ID Team
+      issueType: 'verify_id', // Connects to Verify ID Team
       requestedDafaId: cleanDafaId,
       timeline: [{
         event: `Customer registered and requested verification for Dafa ID: ${cleanDafaId}`,
@@ -956,7 +1016,7 @@ router.post('/customer-verify', async (req, res) => {
       }],
     });
     const io = req.app.get('io');
-    await autoAssignNewIdAgent(lead, newCustomer, io);
+    await autoAssignVerifyIdAgent(lead, newCustomer, io);
     await lead.save();
     await newCustomer.save();
 
@@ -967,7 +1027,7 @@ router.post('/customer-verify', async (req, res) => {
       customerId: newCustomer._id,
       agentId: lead.assignedAgent || null,
       status: 'active',
-      issueType: 'new_id',
+      issueType: 'verify_id',
     });
     await chat.save();
 

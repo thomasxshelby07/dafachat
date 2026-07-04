@@ -222,19 +222,26 @@ const SmartEntry = () => {
                   </div>
                 </button>
 
-                <button onClick={() => resetForm(VIEW.EXISTING_ID)} className={cardButtonCls}>
+                <button 
+                  onClick={() => resetForm(VIEW.EXISTING_ID)} 
+                  className={`w-full flex items-center p-4 rounded-2xl transition-all duration-300 border outline-none text-left cursor-pointer group transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] ${
+                    isDarkCard
+                      ? 'bg-black/50 border-white/5 hover:bg-black/80 hover:border-amber-400/20 text-slate-100 shadow-md'
+                      : 'bg-slate-900 border-slate-800 hover:bg-slate-950 hover:border-slate-700 text-white shadow-md'
+                  }`}
+                >
                   <div 
                     className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0"
-                    style={{ backgroundColor: isDarkCard ? `${primaryColor}20` : `${primaryColor}10` }}
+                    style={{ backgroundColor: 'rgba(0,0,0,0.25)' }}
                   >
-                    <svg className={iconCls} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-amber-400 group-hover:text-amber-300 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
                     </svg>
                   </div>
                   <div className="flex-1 min-w-0 ml-3">
-                    <span className={`text-sm font-bold block ${isDarkCard ? 'text-white' : 'text-slate-800'}`}>Already Have a Dafa Gaming ID</span>
-                    <span className={`text-[10px] mt-0.5 block leading-normal ${isDarkCard ? 'text-slate-300/70' : 'text-text-3'}`}>
-                      Verify and log in to connect to support teams
+                    <span className="text-sm font-bold block text-white">Customer Support</span>
+                    <span className={`text-[10px] mt-0.5 block leading-normal ${isDarkCard ? 'text-slate-300/75' : 'text-slate-400'}`}>
+                      Verify Dafa ID to connect with support agents
                     </span>
                   </div>
                   <div className="flex-shrink-0 text-slate-400 group-hover:text-amber-400 transition-colors pl-2">

@@ -572,7 +572,15 @@ const CustomerDashboard = () => {
                     </p>
                   </>
                 )}
-                {pendingIssueType !== 'new_id' && pendingIssueType !== 'deposit' && pendingIssueType !== 'withdrawal' && (
+                {pendingIssueType === 'verify_id' && (
+                  <>
+                    <p className="font-semibold text-text-1">All our verification experts are currently busy or offline.</p>
+                    <p className="font-semibold text-primary font-mono text-[11px]" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                      अभी वेरिफिकेशन टीम ऑफलाइन है, आप नीचे वाले एक्टिव एजेंट से कनेक्ट कर सकते हैं।
+                    </p>
+                  </>
+                )}
+                {pendingIssueType !== 'new_id' && pendingIssueType !== 'verify_id' && pendingIssueType !== 'deposit' && pendingIssueType !== 'withdrawal' && (
                   <>
                     <p className="font-semibold text-text-1">Our support experts for this category are currently busy or offline.</p>
                     <p className="font-semibold text-primary font-mono text-[11px]" style={{ color: branding.primaryColor || '#B91C1C' }}>

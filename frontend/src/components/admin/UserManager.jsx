@@ -6,6 +6,7 @@ const ISSUE_TYPES = [
   { key: 'deposit', label: 'Deposit Issues' },
   { key: 'withdrawal', label: 'Withdrawal Issues' },
   { key: 'new_id', label: 'New ID Issues' },
+  { key: 'verify_id', label: 'Verify ID Issues' },
   { key: 'other', label: 'General Issues' },
 ];
 

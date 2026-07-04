@@ -801,7 +801,7 @@ router.post('/request-link', auth, async (req, res) => {
       lead = new Lead({
         customerId: customer._id,
         status: 'new',
-        issueType: 'new_id',
+        issueType: 'verify_id',
       });
     }
 
@@ -827,7 +827,7 @@ router.post('/request-link', auth, async (req, res) => {
         chat = new Chat({
           customerId: customer._id,
           status: 'active',
-          issueType: 'new_id',
+          issueType: 'verify_id',
         });
         await chat.save();
       }

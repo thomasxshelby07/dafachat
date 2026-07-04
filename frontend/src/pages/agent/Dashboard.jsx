@@ -8,7 +8,13 @@ import NotificationBell from '../../components/NotificationBell';
 import { requestNotificationPermission, showBrowserNotification, playNotificationSound } from '../../utils/notifications';
 import useIdleTimer from '../../hooks/useIdleTimer';
 
-const ISSUE_LABELS = { deposit: '💳 Deposit', withdrawal: '💸 Withdrawal', other: '💬 General' };
+const ISSUE_LABELS = {
+  deposit: '💳 Deposit',
+  withdrawal: '💸 Withdrawal',
+  new_id: '🆕 New ID',
+  verify_id: '🔍 Verify ID',
+  other: '💬 General'
+};
 
 const AgentDashboard = () => {
   const { user, logout, updateUser } = useAuth();

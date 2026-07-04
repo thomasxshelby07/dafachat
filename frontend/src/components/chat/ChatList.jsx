@@ -118,9 +118,17 @@ const ChatList = ({ chats, activeChatId, onSelectChat, user }) => {
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 border border-current/20 ${
                         chat.issueType === 'deposit' ? 'bg-blue-50 text-blue-600' :
                         chat.issueType === 'withdrawal' ? 'bg-amber-50 text-amber-600' :
+                        chat.issueType === 'new_id' ? 'bg-emerald-50 text-emerald-600' :
+                        chat.issueType === 'verify_id' ? 'bg-indigo-50 text-indigo-600' :
                         'bg-purple-50 text-purple-600'
                       }`}>
-                        {chat.issueType === 'deposit' ? '💳' : chat.issueType === 'withdrawal' ? '💸' : '💬'} {chat.issueType}
+                        {chat.issueType === 'deposit' ? '💳' :
+                         chat.issueType === 'withdrawal' ? '💸' :
+                         chat.issueType === 'new_id' ? '🆕' :
+                         chat.issueType === 'verify_id' ? '🔍' : '💬'} {
+                          chat.issueType === 'new_id' ? 'new id' :
+                          chat.issueType === 'verify_id' ? 'verify id' : chat.issueType
+                         }
                       </span>
                     )}
                     {chat.customerId?.leadStatus && (
