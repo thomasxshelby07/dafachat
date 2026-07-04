@@ -28,8 +28,8 @@ const io = new Server(server, {
     methods: ['GET', 'POST'],
     credentials: false,
   },
-  pingTimeout: 60000,
-  pingInterval: 25000,
+  pingTimeout: 3000,
+  pingInterval: 5000,
   transports: ['polling', 'websocket'],
   allowUpgrades: true,
   perMessageDeflate: false,
@@ -905,17 +905,25 @@ io.on('connection', async (socket) => {
   });
 
   socket.on('disconnect', async () => {
-    delete userSocketMap[userId];
-    await safeRedis.srem(ONLINE_KEY, userId);
-    await safeRedis.del(`user_socket:${userId}`);
-    io.emit('user_status', { userId, status: 'offline' });
+    const activeSockets = await io.fetchSockets();
+    const hasOtherSocket = activeSockets.some(s => s.userId === userId && s.id !== socket.id);
+    
+    if (!hasOtherSocket) {
+      delete userSocketMap[userId];
+      await safeRedis.srem(ONLINE_KEY, userId);
+      await safeRedis.del(`user_socket:${userId}`);
+      io.emit('user_status', { userId, status: 'offline' });
+    }
+    
     logger.info(`Socket disconnected: ${socket.id} (user: ${userId})`);
     
     // To prevent immediate reassignment on simple page reload/refresh,
     // wait a short period and check if they reconnected on a new socket.
     setTimeout(async () => {
-      const { userSocketMap: currentSocketMap } = require('./server');
-      if (!currentSocketMap || !currentSocketMap[userId]) {
+      const activeSocketsCheck = await io.fetchSockets();
+      const stillConnected = activeSocketsCheck.some(s => s.userId === userId);
+      
+      if (!stillConnected) {
         const user = await User.findById(userId);
         if (user && ['agent', 'manager', 'super_admin'].includes(user.role) && user.status !== 'offline') {
           const { updateUserStatus } = require('./utils/activitySystem');
