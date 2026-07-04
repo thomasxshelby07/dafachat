@@ -28,6 +28,46 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
   const [onlineAgents, setOnlineAgents] = useState([]);
   const [loadingOnlineAgents, setLoadingOnlineAgents] = useState(false);
 
+  const [forwardingMessage, setForwardingMessage] = useState(null);
+  const [forwardChats, setForwardChats] = useState([]);
+  const [forwardChatsLoading, setForwardChatsLoading] = useState(false);
+  const [selectedForwardChatIds, setSelectedForwardChatIds] = useState([]);
+  const [forwardSearch, setForwardSearch] = useState('');
+
+  const handleOpenForward = async (msg) => {
+    setForwardingMessage(msg);
+    setForwardChatsLoading(true);
+    setSelectedForwardChatIds([]);
+    setForwardSearch('');
+    try {
+      const res = await api.get('/api/chats?status=active&limit=200');
+      setForwardChats(res.data.chats || []);
+    } catch (err) {
+      console.error('Failed to load chats for forwarding:', err);
+    } finally {
+      setForwardChatsLoading(false);
+    }
+  };
+
+  const handleExecuteForward = async () => {
+    if (selectedForwardChatIds.length === 0 || !forwardingMessage) return;
+    
+    selectedForwardChatIds.forEach(targetChatId => {
+      sendMessage({
+        chatId: targetChatId,
+        content: forwardingMessage.content || '',
+        type: forwardingMessage.type || 'text',
+        mediaUrl: forwardingMessage.mediaUrl || '',
+        mediaPublicId: forwardingMessage.mediaPublicId || '',
+        isInternal: false
+      });
+    });
+
+    alert(`Message forwarded successfully to ${selectedForwardChatIds.length} chats!`);
+    setForwardingMessage(null);
+    setSelectedForwardChatIds([]);
+  };
+
   useEffect(() => {
     if (user?.role === 'customer' && chat?.agentId && (chat.agentId.status === 'offline' || chat.agentId.status === 'break')) {
       const fetchOnlineAgents = async () => {
@@ -433,6 +473,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
                 onImageClick={setZoomedImage}
                 onChatWithSupportClick={onChatWithSupportClick}
                 onReply={setReplyingToMessage}
+                onForward={handleOpenForward}
               />
             </div>
           ))}
@@ -603,6 +644,142 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
             alt="Zoomed View"
             className="max-w-full max-h-full object-contain shadow-2xl"
           />
+        </div>
+      )}
+
+      {forwardingMessage && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface border border-border w-full max-w-sm rounded-xl p-5 shadow-float text-xs flex flex-col max-h-[85vh] animate-scale-in">
+            <h4 className="text-sm font-bold text-text-1 mb-1">Forward Message</h4>
+            <p className="text-text-3 mb-3">Select up to 100 active chats to forward this message to.</p>
+
+            {/* Message Preview */}
+            <div className="p-3 bg-bg border border-border/80 rounded-lg mb-3">
+              <span className="text-[10px] text-text-3 font-semibold uppercase tracking-wider block mb-1">Message Preview</span>
+              <div className="text-xs text-text-2 italic max-h-12 overflow-y-auto">
+                {forwardingMessage.content || (
+                  forwardingMessage.type === 'image' ? '📷 Image File' :
+                  forwardingMessage.type === 'audio' ? '🎤 Voice Note' : '📎 Attachment'
+                )}
+              </div>
+            </div>
+
+            {/* Search filter */}
+            <div className="mb-3">
+              <input
+                type="text"
+                value={forwardSearch}
+                onChange={(e) => setForwardSearch(e.target.value)}
+                placeholder="Search chats by customer name..."
+                className="input-field"
+              />
+            </div>
+
+            {/* Chats list */}
+            <div className="flex-1 overflow-y-auto space-y-2 mb-4 border border-border/60 rounded-lg p-2 max-h-[300px]">
+              {forwardChatsLoading ? (
+                <div className="p-4 text-center text-text-3 font-medium">Loading active chats...</div>
+              ) : forwardChats.length === 0 ? (
+                <div className="p-4 text-center text-text-3 italic">No active chats found.</div>
+              ) : (
+                <>
+                  {/* Select All */}
+                  <label className="flex items-center gap-3 p-2 bg-bg/50 rounded-lg cursor-pointer border border-border/40 hover:bg-bg transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={
+                        forwardChats.length > 0 &&
+                        forwardChats
+                          .filter(c => c.customerId?.fullName?.toLowerCase().includes(forwardSearch.toLowerCase()))
+                          .every(c => selectedForwardChatIds.includes(c._id))
+                      }
+                      onChange={(e) => {
+                        const filtered = forwardChats.filter(c => 
+                          c.customerId?.fullName?.toLowerCase().includes(forwardSearch.toLowerCase())
+                        );
+                        if (e.target.checked) {
+                          const newIds = [...selectedForwardChatIds];
+                          filtered.forEach(c => {
+                            if (!newIds.includes(c._id) && newIds.length < 100) {
+                              newIds.push(c._id);
+                            }
+                          });
+                          setSelectedForwardChatIds(newIds);
+                        } else {
+                          const filteredIds = filtered.map(c => c._id);
+                          setSelectedForwardChatIds(prev => prev.filter(id => !filteredIds.includes(id)));
+                        }
+                      }}
+                      className="rounded text-primary border-border focus:ring-primary h-4 w-4"
+                    />
+                    <div className="font-bold text-text-1">Select All (Filtered)</div>
+                  </label>
+
+                  {/* Individual Chats */}
+                  {forwardChats
+                    .filter(c => !forwardSearch || c.customerId?.fullName?.toLowerCase().includes(forwardSearch.toLowerCase()))
+                    .map(c => {
+                      const isChecked = selectedForwardChatIds.includes(c._id);
+                      return (
+                        <label 
+                          key={c._id} 
+                          className={`flex items-center gap-3 p-2 rounded-lg cursor-pointer border transition-colors ${
+                            isChecked ? 'border-primary/30 bg-primary/5' : 'border-border/40 hover:bg-bg'
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            disabled={!isChecked && selectedForwardChatIds.length >= 100}
+                            onChange={() => {
+                              if (isChecked) {
+                                setSelectedForwardChatIds(prev => prev.filter(id => id !== c._id));
+                              } else {
+                                if (selectedForwardChatIds.length < 100) {
+                                  setSelectedForwardChatIds(prev => [...prev, c._id]);
+                                }
+                              }
+                            }}
+                            className="rounded text-primary border-border focus:ring-primary h-4 w-4"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="font-bold text-text-1 truncate">{c.customerId?.fullName || 'Customer'}</div>
+                            <div className="text-[10px] text-text-3 font-semibold mt-0.5">Dafa ID: {c.customerId?.dafaxbetId || 'N/A'} • {c.customerId?.mobile || 'No Mobile'}</div>
+                          </div>
+                        </label>
+                      );
+                    })}
+                </>
+              )}
+            </div>
+
+            {/* Limit warning */}
+            {selectedForwardChatIds.length >= 100 && (
+              <div className="mb-3 px-3 py-1.5 bg-danger/10 border border-danger/25 text-danger rounded-lg text-[10px] font-extrabold uppercase tracking-wide text-center">
+                ⚠️ Maximum 100 chats selection limit reached
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center justify-between pt-2 border-t border-border">
+              <span className="font-bold text-text-2">{selectedForwardChatIds.length} of 100 selected</span>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => { setForwardingMessage(null); setSelectedForwardChatIds([]); }}
+                  className="btn-secondary py-1.5 px-3 rounded-xl cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleExecuteForward}
+                  disabled={selectedForwardChatIds.length === 0}
+                  className="btn-primary py-1.5 px-4 font-bold disabled:opacity-50 cursor-pointer rounded-xl"
+                >
+                  Forward
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

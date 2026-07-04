@@ -15,7 +15,7 @@ const roleColors = {
   customer: 'bg-gray-100 text-gray-700',
 };
 
-const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImageClick, onChatWithSupportClick, onReply }) => {
+const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImageClick, onChatWithSupportClick, onReply, onForward }) => {
   const [showMenu, setShowMenu] = useState(false);
 
   const formatTime = (date) => {
@@ -240,6 +240,11 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
 
   const canDelete = viewerRole !== 'customer' && message.senderRole !== 'customer' && onDelete;
 
+  const isImageFileName = (str) => {
+    if (!str || typeof str !== 'string') return false;
+    return /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(str.trim()) && !str.trim().includes(' ');
+  };
+
   const parseBoldText = (str) => {
     if (typeof str !== 'string') return str;
     const boldRegex = /(\*\*[^*]+\*\*)/g;
@@ -304,7 +309,7 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
       <div className="flex items-center gap-2 max-w-[85%] relative">
         {isOwn && onReply && (
           <button
-            onClick={onReply}
+            onClick={() => onReply(message)}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-bg text-text-3 hover:text-primary order-first shrink-0 bg-transparent border-0 cursor-pointer"
             title="Reply"
           >
@@ -315,7 +320,7 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
         )}
 
         <div
-          onDoubleClick={onReply}
+          onDoubleClick={() => onReply(message)}
           className={`
             px-3.5 py-2 relative
             ${isOwn
@@ -366,7 +371,7 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
               </span>
             </div>
           )}
-          {message.content && message.type !== 'audio' && (
+          {message.content && message.type !== 'audio' && (message.type !== 'image' || !isImageFileName(message.content)) && (
             <div className="text-[13px] leading-relaxed whitespace-pre-wrap break-words">
               {renderMessageContent(message.content)}
             </div>
@@ -378,7 +383,7 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
             {renderStatus(message.status)}
           </div>
 
-          {canDelete && (
+          {viewerRole !== 'customer' && (
             <button
               onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
               className={`absolute top-1 ${isOwn ? '-left-7' : '-right-7'} opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-bg bg-transparent border-0 cursor-pointer`}
@@ -392,21 +397,32 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
           {showMenu && (
             <div className={`absolute top-0 ${isOwn ? 'right-0 mr-1' : 'left-0 ml-1'} bg-surface border border-border rounded-lg shadow-float z-30 py-1 min-w-[100px]`}>
               <button
-                onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(message._id); }}
-                className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 bg-transparent border-0 cursor-pointer"
+                onClick={(e) => { e.stopPropagation(); setShowMenu(false); onForward?.(message); }}
+                className="w-full px-3 py-2 text-left text-sm text-text-1 hover:bg-bg flex items-center gap-2 bg-transparent border-0 cursor-pointer"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 10.742a3 3 0 11-2.2-2.2l4.287-2.143a3 3 0 112.24 2.24L8.684 10.742z" />
                 </svg>
-                Delete
+                Forward
               </button>
+              {canDelete && (
+                <button
+                  onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(message._id); }}
+                  className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 bg-transparent border-0 cursor-pointer"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete
+                </button>
+              )}
             </div>
           )}
         </div>
 
         {!isOwn && onReply && (
           <button
-            onClick={onReply}
+            onClick={() => onReply(message)}
             className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-bg text-text-3 hover:text-primary shrink-0 bg-transparent border-0 cursor-pointer"
             title="Reply"
           >
