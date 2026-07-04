@@ -2,7 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react';
 import QuickReplyPicker from './QuickReplyPicker';
 import StickerPicker from './StickerPicker';
 
-const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQuickReplies: showQuickRepliesProp = false }) => {
+const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQuickReplies: showQuickRepliesProp = false, replyingTo = null, onCancelReply = null }) => {
   const [message, setMessage] = useState('');
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
@@ -22,8 +22,10 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
         content: 'Sticker',
         type: 'sticker',
         mediaUrl: value,
+        replyTo: replyingTo ? replyingTo._id : undefined
       });
       setShowStickerPicker(false);
+      if (onCancelReply) onCancelReply();
     }
   };
 
@@ -80,6 +82,7 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
     onSend({
       content: message.trim(),
       isInternal: false,
+      replyTo: replyingTo ? replyingTo._id : undefined
     });
 
     setMessage('');
@@ -90,6 +93,7 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
       clearTimeout(typingTimeoutRef.current);
     }
     if (onTypingStop) onTypingStop();
+    if (onCancelReply) onCancelReply();
   };
 
   const handleKeyDown = (e) => {
@@ -190,7 +194,9 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
           content: file.name,
           type: file.type.startsWith('image/') ? 'image' : 'file',
           file,
+          replyTo: replyingTo ? replyingTo._id : undefined
         });
+        if (onCancelReply) onCancelReply();
       }
     };
 
@@ -225,6 +231,24 @@ const ChatInput = ({ onSend, onTypingStart, onTypingStop, isAgent = false, showQ
 
   return (
     <div className="border-t border-border bg-surface">
+      {replyingTo && (
+        <div className="flex items-center justify-between px-4 py-2 bg-primary/5 border-b border-border text-xs">
+          <div className="flex-1 min-w-0 border-l-2 border-primary pl-2.5 animate-slide-in">
+            <div className="font-bold text-primary truncate">
+              Reply to {replyingTo.senderName || (replyingTo.senderRole === 'customer' ? 'Customer' : 'Agent')}
+            </div>
+            <div className="text-text-2 truncate mt-0.5">
+              {replyingTo.content || (replyingTo.type === 'image' ? '📷 Image' : replyingTo.type === 'audio' ? '🎤 Voice note' : '📎 File')}
+            </div>
+          </div>
+          <button onClick={onCancelReply} className="text-text-3 hover:text-text-1 p-1 bg-transparent border-0 cursor-pointer">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+      )}
+
       {isAgent && (
         <div className="flex items-center gap-1 px-3 pt-2">
           <button

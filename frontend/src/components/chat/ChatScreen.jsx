@@ -22,6 +22,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
   const typingTimeoutRef = useRef(null);
   const [zoomedImage, setZoomedImage] = useState(null);
   const [showNotesSidebar, setShowNotesSidebar] = useState(false);
+  const [replyingToMessage, setReplyingToMessage] = useState(null);
   const prevMessagesLengthRef = useRef(0);
   const lastMessageIdRef = useRef(null);
   const [onlineAgents, setOnlineAgents] = useState([]);
@@ -278,7 +279,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
     return () => container.removeEventListener('scroll', handleScroll);
   }, [handleLoadMore, hasMore, loadingMore]);
 
-  const handleSend = ({ content, type = 'text', mediaUrl, mediaPublicId, isInternal, file }) => {
+  const handleSend = useCallback(({ content, type = 'text', mediaUrl, mediaPublicId, isInternal, file, replyTo }) => {
     if (file) {
       const tempId = `temp-${Date.now()}`;
       const isImg = file.type.startsWith('image/');
@@ -295,6 +296,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
         mediaUrl: URL.createObjectURL(file),
         status: 'sending',
         createdAt: new Date().toISOString(),
+        replyTo: replyTo ? messages.find(m => m._id === replyTo) : undefined,
       };
       
       setMessages(prev => [...prev, tempMsg]);
@@ -314,6 +316,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
           mediaUrl: res.data.mediaUrl,
           mediaPublicId: res.data.mediaPublicId,
           isInternal: false,
+          replyTo,
         });
       }).catch(err => {
         console.error('Media upload failed:', err);
@@ -334,6 +337,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
         status: 'sending',
         isInternal: isInternal || false,
         createdAt: new Date().toISOString(),
+        replyTo: replyTo ? messages.find(m => m._id === replyTo) : undefined,
       };
       
       setMessages(prev => [...prev, tempMsg]);
@@ -346,9 +350,10 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
         mediaUrl,
         mediaPublicId,
         isInternal,
+        replyTo,
       });
     }
-  };
+  }, [chatId, user, sendMessage, messages]);
 
   const handleTypingStart = () => {
     startTyping({ chatId });
@@ -384,7 +389,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
   }
 
   return (
-    <div className="flex flex-col h-full w-full bg-bg overflow-hidden relative">
+    <div className="flex flex-row h-full w-full bg-bg overflow-hidden relative">
       {/* Left / Main Chat Content Area */}
       <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
         <ChatHeader
@@ -427,6 +432,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
                 onDelete={user?.role !== 'customer' ? handleDeleteMessage : null}
                 onImageClick={setZoomedImage}
                 onChatWithSupportClick={onChatWithSupportClick}
+                onReply={setReplyingToMessage}
               />
             </div>
           ))}
@@ -501,6 +507,8 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
             onTypingStop={handleTypingStop}
             isAgent={user?.role !== 'customer'}
             showQuickReplies={user?.role !== 'customer'}
+            replyingTo={replyingToMessage}
+            onCancelReply={() => setReplyingToMessage(null)}
           />
         )}
       </div>

@@ -74,6 +74,9 @@ const CustomerDashboard = () => {
   const [isExistingIdUpgrade, setIsExistingIdUpgrade] = useState(false);
   const pendingPrefilledMessageRef = useRef(false);
 
+  const [fallbackAgents, setFallbackAgents] = useState([]);
+  const [showFallbackSelector, setShowFallbackSelector] = useState(false);
+  const [pendingIssueType, setPendingIssueType] = useState('other');
   const [isWidgetOpen, setIsWidgetOpen] = useState(true);
 
   useEffect(() => {
@@ -267,6 +270,13 @@ const CustomerDashboard = () => {
       }
     };
 
+    const handleNoAgentsForCategory = (data) => {
+      setFallbackAgents(data.onlineAgents || []);
+      setShowFallbackSelector(true);
+      setStartingChat(false);
+      setPendingIssueType(data.issueType || 'other');
+    };
+
     on('chat_joined', handleChatJoined);
     on('chat_closed', handleChatClosed);
     on('agent_assigned', handleAgentAssigned);
@@ -278,6 +288,7 @@ const CustomerDashboard = () => {
     on('new_broadcast', handleNewBroadcast);
     on('lead_upgraded', handleLeadUpgraded);
     on('lead_verification_failed', handleLeadVerificationFailed);
+    on('no_agents_for_category', handleNoAgentsForCategory);
     on('error', handleError);
     return () => {
       off('chat_joined', handleChatJoined);
@@ -291,6 +302,7 @@ const CustomerDashboard = () => {
       off('new_broadcast', handleNewBroadcast);
       off('lead_upgraded', handleLeadUpgraded);
       off('lead_verification_failed', handleLeadVerificationFailed);
+      off('no_agents_for_category', handleNoAgentsForCategory);
       off('error', handleError);
     };
   }, [on, off]);
@@ -511,7 +523,67 @@ const CustomerDashboard = () => {
       )}
 
       <main className="w-full max-w-lg mx-auto pb-6">
-        {showIssueSelector ? (
+        {showFallbackSelector ? (
+          <div className="px-4 pt-6">
+            <div className="mb-5">
+              <h2 className="text-base font-bold text-text-1 mb-1 flex items-center gap-1.5 text-warning" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                {pendingIssueType.toUpperCase()} Team is Offline
+              </h2>
+              <p className="text-xs text-text-2 leading-relaxed">
+                All our {pendingIssueType} experts are currently busy or offline. You can connect and chat with one of our other active online agents below:
+              </p>
+            </div>
+            <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
+              {fallbackAgents.map(ag => (
+                <button
+                  key={ag._id}
+                  onClick={() => {
+                    setStartingChat(true);
+                    setShowFallbackSelector(false);
+                    setShowIssueSelector(false);
+                    startChat(pendingIssueType, ag._id);
+                  }}
+                  disabled={startingChat}
+                  className="w-full flex items-center justify-between p-3.5 bg-surface border border-border hover:border-primary/50 hover:bg-bg/40 transition-all text-left rounded-xl shadow-sm outline-none cursor-pointer group"
+                >
+                  <div className="flex items-center gap-3">
+                    {ag.avatar ? (
+                      <img src={ag.avatar} alt="" className="w-10 h-10 rounded-full object-cover border border-success/30 animate-pulse" />
+                    ) : (
+                      <div className="w-10 h-10 bg-primary/10 text-primary text-sm font-extrabold rounded-full flex items-center justify-center border border-primary/25" style={{ backgroundColor: `${branding.primaryColor || '#B91C1C'}15`, color: branding.primaryColor || '#B91C1C' }}>
+                        {ag.fullName?.charAt(0)}
+                      </div>
+                    )}
+                    <div>
+                      <div className="text-xs font-bold text-text-1">{ag.fullName}</div>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {(ag.permissions?.issueTypes && ag.permissions.issueTypes.length > 0 ? ag.permissions.issueTypes : ['deposit', 'withdrawal', 'other']).map(tag => (
+                          <span key={tag} className="px-1.5 py-0.2 bg-primary/10 text-primary text-[8px] font-extrabold uppercase rounded" style={{ backgroundColor: `${branding.primaryColor || '#B91C1C'}15`, color: branding.primaryColor || '#B91C1C' }}>
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="px-3 py-1.5 bg-primary text-white text-[10px] font-extrabold rounded-lg uppercase shadow-sm group-hover:brightness-110 active:scale-95 transition-all" style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}>
+                    Connect
+                  </div>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => { setShowFallbackSelector(false); setSelectedIssueKey(null); }}
+              disabled={startingChat}
+              className="w-full mt-4 py-3 text-sm font-semibold text-text-2 hover:text-text-1 border border-border rounded-lg transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : showIssueSelector ? (
           <div className="px-4 pt-6">
             <div className="mb-5">
               <h2 className="text-lg font-bold text-text-1 mb-1">What do you need help with?</h2>

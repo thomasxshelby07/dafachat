@@ -4,7 +4,51 @@ const Chat = require('../models/Chat');
 const Customer = require('../models/Customer');
 const Notification = require('../models/Notification');
 const Settings = require('../models/Settings');
+const AgentActivityLog = require('../models/AgentActivityLog');
 const logger = require('./logger');
+
+async function logHistoricalStatus(userId, status, startedAt, endedAt) {
+  try {
+    const duration = Math.round((endedAt - startedAt) / 1000);
+    if (duration <= 0) return;
+
+    // Format date in local YYYY-MM-DD
+    const offset = startedAt.getTimezoneOffset();
+    const localStarted = new Date(startedAt.getTime() - (offset * 60 * 1000));
+    const dateStr = localStarted.toISOString().split('T')[0];
+
+    // Find or create daily log
+    let dailyLog = await AgentActivityLog.findOne({ userId, date: dateStr });
+    if (!dailyLog) {
+      dailyLog = new AgentActivityLog({
+        userId,
+        date: dateStr,
+        activeTime: 0,
+        breakTime: 0,
+        statusLogs: [],
+      });
+    }
+
+    // Accumulate daily totals
+    if (status === 'online') {
+      dailyLog.activeTime += duration;
+    } else if (status === 'break') {
+      dailyLog.breakTime += duration;
+    }
+
+    // Add detailed status log segment
+    dailyLog.statusLogs.push({
+      status,
+      startedAt,
+      endedAt,
+      duration,
+    });
+
+    await dailyLog.save();
+  } catch (err) {
+    logger.error('Error logging historical status:', err);
+  }
+}
 
 // Store active reassignment timers: { [leadId]: setTimeoutInstance }
 const reassignmentTimers = {};
@@ -39,6 +83,8 @@ async function updateUserStatus(userId, newStatus, io) {
         user.todayActiveTime = 0;
         user.todayBreakTime = 0;
       }
+      // Log status session historically
+      await logHistoricalStatus(userId, oldStatus, statusChangedAt, now);
     }
 
     user.status = newStatus;

@@ -118,9 +118,9 @@ export const useSocket = () => {
     }
   }, []);
 
-  const startChat = useCallback((issueType) => {
+  const startChat = useCallback((issueType, fallbackAgentId) => {
     if (globalSocket?.connected) {
-      globalSocket.emit('start_chat', { issueType: issueType || 'other' });
+      globalSocket.emit('start_chat', { issueType: issueType || 'other', fallbackAgentId });
     }
   }, []);
 

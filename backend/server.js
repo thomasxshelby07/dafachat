@@ -334,15 +334,15 @@ io.on('connection', async (socket) => {
 
   socket.on('send_message', async (data) => {
     try {
-      const { chatId, content, type = 'text', mediaUrl, mediaPublicId, isInternal = false } = data;
-
+      const { chatId, content, type = 'text', mediaUrl, mediaPublicId, isInternal = false, replyTo } = data;
+ 
       const actualIsInternal = isInternal && ['agent', 'manager', 'super_admin'].includes(userRole);
-
+ 
       const chat = await Chat.findById(chatId);
       if (!chat) {
         return socket.emit('error', { message: 'Chat not found' });
       }
-
+ 
       const message = new Message({
         chatId,
         senderId: userId,
@@ -354,13 +354,21 @@ io.on('connection', async (socket) => {
         mediaPublicId,
         isInternal: actualIsInternal,
         status: 'sent',
+        replyTo: replyTo || undefined,
       });
       await message.save();
-
+ 
       await Chat.findByIdAndUpdate(chatId, { lastMessageAt: new Date() });
-
+ 
       const messageObj = message.toObject();
       messageObj.senderName = socket.user.fullName;
+
+      if (replyTo) {
+        const repliedMsg = await Message.findById(replyTo).select('_id content senderName senderRole type mediaUrl');
+        if (repliedMsg) {
+          messageObj.replyTo = repliedMsg.toObject();
+        }
+      }
 
       if (actualIsInternal) {
         const staffInChat = await User.find({
@@ -562,7 +570,7 @@ io.on('connection', async (socket) => {
 
   socket.on('start_chat', async (data) => {
     try {
-      const { issueType = 'other' } = data || {};
+      const { issueType = 'other', fallbackAgentId } = data || {};
       const customer = await Customer.findOne({ userId });
       if (!customer) {
         return socket.emit('error', { message: 'Customer profile not found' });
@@ -604,28 +612,66 @@ io.on('connection', async (socket) => {
         return socket.emit('error', { message: 'Failed to initialize chat' });
       }
 
-      if (!freshChat.agentId || issueTypeChanged) {
+      if (!freshChat.agentId || issueTypeChanged || fallbackAgentId) {
         const oldAgentId = freshChat.agentId;
-        const agent = await findBestAgent(issueType);
+        let agent = null;
+
+        if (fallbackAgentId) {
+          agent = await User.findOne({
+            _id: fallbackAgentId,
+            isActive: true,
+            status: 'online',
+            role: { $in: ['agent', 'manager', 'super_admin'] }
+          }).select('_id fullName status permissions role');
+        }
+
+        if (!agent) {
+          const categoryQuery = {
+            isActive: true,
+            status: 'online',
+            role: { $in: ['agent', 'manager', 'super_admin'] }
+          };
+
+          if (issueType === 'new_id') {
+            categoryQuery['permissions.issueTypes'] = 'new_id';
+          } else {
+            categoryQuery.$or = [
+              { 'permissions.issueTypes': issueType },
+              { 'permissions.issueTypes': { $size: 0 } },
+              { 'permissions.issueTypes': { $exists: false } },
+              { $expr: { $eq: [{ $size: { $ifNull: ['$permissions.issueTypes', []] } }, 0] } }
+            ];
+          }
+
+          const candidates = await User.find(categoryQuery).select('_id fullName status permissions role');
+          if (candidates.length > 0) {
+            const counts = await Promise.all(
+              candidates.map(async (cand) => {
+                const count = await Chat.countDocuments({ agentId: cand._id, status: 'active' });
+                return { cand, count };
+              })
+            );
+            counts.sort((a, b) => a.count - b.count);
+            agent = counts[0].cand;
+          }
+        }
+
         if (agent) {
-          // Check if it's actually a different agent
           if (!oldAgentId || oldAgentId.toString() !== agent._id.toString()) {
             freshChat.agentId = agent._id;
             await freshChat.save();
 
-            // Update customer
             customer.assignedAgent = agent._id;
             customer.leadStatus = 'assigned';
             await customer.save();
 
-            // Update lead
             const lead = await Lead.findOne({ customerId: customer._id });
             if (lead) {
               lead.assignedAgent = agent._id;
               lead.assignedAgents = [agent._id];
               lead.status = 'assigned';
               lead.timeline.push({
-                event: `Auto-reassigned to ${agent.fullName} (${issueType}) due to issue change`,
+                event: `Auto-assigned to ${agent.fullName} (${issueType})`,
                 date: new Date(),
                 by: userId,
               });
@@ -633,7 +679,6 @@ io.on('connection', async (socket) => {
               await lead.save();
             }
 
-            // Notify the new assigned agent
             const agentNotif = new Notification({
               userId: agent._id,
               type: 'agent_assigned',
@@ -644,7 +689,6 @@ io.on('connection', async (socket) => {
             await agentNotif.save();
             await sendNotificationToUser(agent._id, agentNotif);
 
-            // Emit to agent socket directly
             const agentSocketId = userSocketMap[agent._id.toString()];
             if (agentSocketId) {
               io.to(agentSocketId).emit('new_chat_assigned', {
@@ -655,7 +699,6 @@ io.on('connection', async (socket) => {
               });
             }
 
-            // Notify old agent that they were reassigned/unassigned
             if (oldAgentId) {
               const oldAgentSocketId = userSocketMap[oldAgentId.toString()];
               if (oldAgentSocketId) {
@@ -667,7 +710,6 @@ io.on('connection', async (socket) => {
               }
             }
 
-            // Notify customer about agent assignment
             const customerNotif = new Notification({
               userId: customer.userId,
               type: 'agent_assigned',
@@ -678,15 +720,27 @@ io.on('connection', async (socket) => {
             await customerNotif.save();
             io.to(socket.id).emit('new_notification', customerNotif);
 
-            // Emit agent_assigned event to customer socket
             io.to(socket.id).emit('agent_assigned', {
               agentName: agent.fullName,
               chatId: freshChat._id,
             });
           }
         } else {
-          // No agent available — notify all staff about new chat
-          await notifyAgentsNewChat(freshChat, customer);
+          const onlineOthers = await User.find({
+            isActive: true,
+            status: 'online',
+            role: { $in: ['agent', 'manager', 'super_admin'] }
+          }).select('_id fullName avatar permissions.issueTypes role');
+
+          if (onlineOthers.length > 0) {
+            return socket.emit('no_agents_for_category', {
+              issueType,
+              chatId: freshChat._id.toString(),
+              onlineAgents: onlineOthers
+            });
+          } else {
+            await notifyAgentsNewChat(freshChat, customer);
+          }
         }
       }
 
@@ -860,7 +914,20 @@ io.on('connection', async (socket) => {
     await safeRedis.del(`user_socket:${userId}`);
     io.emit('user_status', { userId, status: 'offline' });
     logger.info(`Socket disconnected: ${socket.id} (user: ${userId})`);
-    // NOTE: Agent status NOT changed on disconnect — status is manual only.
+    
+    // To prevent immediate reassignment on simple page reload/refresh,
+    // wait a short period and check if they reconnected on a new socket.
+    setTimeout(async () => {
+      const { userSocketMap: currentSocketMap } = require('./server');
+      if (!currentSocketMap || !currentSocketMap[userId]) {
+        const user = await User.findById(userId);
+        if (user && ['agent', 'manager', 'super_admin'].includes(user.role) && user.status !== 'offline') {
+          const { updateUserStatus } = require('./utils/activitySystem');
+          await updateUserStatus(userId, 'offline', io);
+          logger.info(`Automatically set agent ${user.fullName} status to offline due to socket disconnect.`);
+        }
+      }
+    }, 5000);
   });
 });
 

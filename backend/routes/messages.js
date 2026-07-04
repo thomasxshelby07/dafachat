@@ -90,6 +90,10 @@ router.get('/:chatId', auth, async (req, res) => {
 
     const messages = await Message.find(query)
       .populate('senderId', 'fullName')
+      .populate({
+        path: 'replyTo',
+        select: '_id content senderName senderRole type mediaUrl'
+      })
       .sort({ createdAt: -1 })
       .limit(parseInt(limit))
       .lean();
@@ -110,7 +114,7 @@ router.get('/:chatId', auth, async (req, res) => {
 
 router.post('/', auth, async (req, res) => {
   try {
-    const { chatId, content, type = 'text', mediaUrl, mediaPublicId, isInternal = false } = req.body;
+    const { chatId, content, type = 'text', mediaUrl, mediaPublicId, isInternal = false, replyTo } = req.body;
 
     if (!chatId) {
       return res.status(400).json({ error: 'ChatId is required' });
@@ -132,14 +136,23 @@ router.post('/', auth, async (req, res) => {
       mediaPublicId,
       isInternal,
       status: 'sent',
+      replyTo: replyTo || undefined,
     });
     await message.save();
 
     await Chat.findByIdAndUpdate(chatId, { lastMessageAt: new Date() });
 
+    const messageObj = message.toObject();
+    if (replyTo) {
+      const repliedMsg = await Message.findById(replyTo).select('_id content senderName senderRole type mediaUrl');
+      if (repliedMsg) {
+        messageObj.replyTo = repliedMsg.toObject();
+      }
+    }
+
     const io = req.app.get('io');
     if (io) {
-      io.to(chatId).emit('new_message', message.toObject());
+      io.to(chatId).emit('new_message', messageObj);
     }
 
     // If sender is customer and agent is offline/break, trigger grace period reassignment timer!

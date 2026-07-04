@@ -188,17 +188,19 @@ const AgentDashboard = () => {
   const statusLabels = { online: 'Online', away: 'Away', break: 'On Break', offline: 'Offline' };
 
   return (
-    <div className="h-screen flex bg-bg overflow-hidden">
+    <div className="h-screen flex bg-bg overflow-hidden relative">
       {/* Sidebar */}
-      <div className="w-[280px] bg-surface border-r border-border flex flex-col flex-shrink-0">
+      <div className={`w-full md:w-[280px] bg-surface border-r border-border flex flex-col flex-shrink-0 transition-all duration-300 ${
+        activeChat ? 'hidden md:flex' : 'flex'
+      }`}>
         {/* Agent Header */}
-        <div className="bg-primary px-5 py-4 flex-shrink-0">
+        <div className="bg-primary px-5 py-4 flex-shrink-0" style={{ backgroundColor: 'var(--primary)' }}>
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-3">
               {user?.avatar ? (
-                <img src={user.avatar} alt="Avatar" className="w-11 h-11 object-cover border border-white/20" />
+                <img src={user.avatar} alt="Avatar" className="w-11 h-11 object-cover rounded-full border-2 border-white/30 shadow-md" />
               ) : (
-                <div className="w-11 h-11 border border-white/20 flex items-center justify-center">
+                <div className="w-11 h-11 bg-white/10 rounded-full border border-white/20 flex items-center justify-center shadow-inner">
                   <span className="text-base font-bold text-white">{user?.fullName?.charAt(0) || 'A'}</span>
                 </div>
               )}
@@ -211,7 +213,7 @@ const AgentDashboard = () => {
               <NotificationBell className="text-white hover:text-white/80" align="left" />
               <button
                 onClick={() => setShowProfileModal(true)}
-                className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all"
+                className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all rounded-full cursor-pointer bg-transparent border-0 outline-none"
                 title="Edit Profile"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -219,8 +221,8 @@ const AgentDashboard = () => {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
-              <button onClick={logout} className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+              <button onClick={logout} className="w-9 h-9 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/10 transition-all rounded-full cursor-pointer bg-transparent border-0 outline-none">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4.5 w-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
               </button>
             </div>
           </div>
@@ -228,34 +230,34 @@ const AgentDashboard = () => {
           {/* Status + Stats */}
           <div className="flex items-center gap-2">
             <div className="relative flex-1">
-              <button onClick={() => setShowStatusMenu(!showStatusMenu)} className="flex items-center gap-2 px-3 py-2 text-xs font-medium bg-white/10 border border-white/20 hover:bg-white/20 transition-colors w-full">
+              <button onClick={() => setShowStatusMenu(!showStatusMenu)} className="flex items-center gap-2 px-3.5 py-2 text-xs font-extrabold bg-white/10 border border-white/15 hover:bg-white/20 rounded-xl transition-all w-full text-left outline-none cursor-pointer">
                 <div className={`w-2.5 h-2.5 rounded-full ${statusColors[currentStatus]}`} />
                 <span className="text-white/90">{statusLabels[currentStatus]}</span>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 text-white/40 ml-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
               </button>
               {showStatusMenu && (
-                <div className="absolute left-0 top-full mt-1 w-full bg-surface border border-border shadow-float z-50 overflow-hidden">
+                <div className="absolute left-0 top-full mt-1.5 w-full bg-surface border border-border shadow-float rounded-xl z-50 overflow-hidden backdrop-blur-md">
                   {[
                     { key: 'online', label: 'Online', color: 'bg-emerald-500' },
                     { key: 'break', label: 'On Break', color: 'bg-amber-500' },
                     { key: 'offline', label: 'Offline', color: 'bg-gray-500' }
                   ].map(({ key, label, color }) => (
-                    <button key={key} onClick={() => handleStatusChange(key)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-bg transition-colors ${currentStatus === key ? 'bg-primary-light' : ''}`}>
-                      <div className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-text-1">{label}</span>
+                    <button key={key} onClick={() => handleStatusChange(key)} className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm text-left hover:bg-bg transition-colors cursor-pointer border-0 bg-transparent outline-none ${currentStatus === key ? 'bg-primary-light' : ''}`}>
+                      <div className={`w-2.5 h-2.5 rounded-full ${color}`} /><span className="text-text-1 font-bold">{label}</span>
                     </button>
                   ))}
                 </div>
               )}
             </div>
-            <div className="flex items-center gap-3 px-3 py-2 bg-white/10 border border-white/20">
+            <div className="flex items-center gap-3 px-3 py-1.5 bg-white/10 border border-white/15 rounded-xl select-none">
               <div className="text-center">
-                <p className="text-sm font-bold text-white">{activeChatsCount}</p>
-                <p className="text-[10px] text-white/50">Active</p>
+                <p className="text-xs font-extrabold text-white leading-none">{activeChatsCount}</p>
+                <p className="text-[9px] text-white/60 font-semibold mt-0.5 uppercase tracking-wider">Active</p>
               </div>
               {totalUnread > 0 && (
                 <div className="text-center">
-                  <p className="text-sm font-bold text-white">{totalUnread}</p>
-                  <p className="text-[10px] text-white/50">Unread</p>
+                  <p className="text-xs font-extrabold text-white leading-none">{totalUnread}</p>
+                  <p className="text-[9px] text-white/60 font-semibold mt-0.5 uppercase tracking-wider">Unread</p>
                 </div>
               )}
             </div>
@@ -263,15 +265,15 @@ const AgentDashboard = () => {
         </div>
 
         {/* Search */}
-        <div className="px-3 py-2.5 border-b border-border">
+        <div className="px-3.5 py-2.5 border-b border-border bg-bg/5">
           <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-            <input type="text" placeholder="Search conversations..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2.5 bg-bg border border-border text-sm placeholder-text-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+            <input type="text" placeholder="Search conversations..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 bg-bg border border-border rounded-xl text-sm placeholder-text-3 focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all" />
           </div>
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex gap-0.5 px-1 py-1.5 border-b border-border overflow-x-auto scrollbar-hide">
+        <div className="flex gap-1.5 px-3.5 py-2 border-b border-border overflow-x-auto scrollbar-none bg-surface/50">
           {[
             { key: 'all', label: 'All' },
             { key: 'active', label: 'Active', count: activeChatsCount },
@@ -279,8 +281,17 @@ const AgentDashboard = () => {
             { key: 'new', label: 'New' },
             { key: 'done', label: 'Done' }
           ].map(({ key, label, count }) => (
-            <button key={key} onClick={() => setFilter(key)} className={`px-1.5 py-1 text-[10px] font-bold rounded transition-all whitespace-nowrap ${filter === key ? 'bg-primary text-white shadow-sm' : 'bg-bg text-text-2 hover:text-text-1 border border-border'}`}>
-              {label}{count > 0 && <span className="ml-0.5 opacity-80 text-[9px]">({count})</span>}
+            <button 
+              key={key} 
+              onClick={() => setFilter(key)} 
+              className={`px-3.5 py-1.5 text-[10px] font-extrabold rounded-full transition-all whitespace-nowrap cursor-pointer border ${
+                filter === key 
+                  ? 'bg-primary text-white border-primary shadow-sm hover:brightness-110' 
+                  : 'bg-bg text-text-2 hover:text-text-1 border-border/80 hover:border-border'
+              }`}
+              style={filter === key ? { backgroundColor: 'var(--primary)', borderColor: 'var(--primary)' } : {}}
+            >
+              {label.toUpperCase()}{count > 0 && <span className="ml-1 px-1.5 py-0.2 bg-white/20 rounded-full text-[9px] font-bold">{count}</span>}
             </button>
           ))}
         </div>
@@ -288,12 +299,12 @@ const AgentDashboard = () => {
         {/* Chat List */}
         <div className="flex-1 overflow-y-auto">
           {loading ? (
-            <div className="space-y-0">{[1, 2, 3].map(i => (<div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-border animate-pulse"><div className="w-11 h-11 bg-bg" /><div className="flex-1 space-y-2"><div className="h-4 bg-bg rounded w-1/3" /><div className="h-3 bg-bg rounded w-2/3" /></div></div>))}</div>
+            <div className="space-y-0">{[1, 2, 3].map(i => (<div key={i} className="flex items-center gap-3 px-4 py-3 border-b border-border animate-pulse"><div className="w-11 h-11 bg-bg rounded-xl" /><div className="flex-1 space-y-2"><div className="h-4 bg-bg rounded w-1/3" /><div className="h-3 bg-bg rounded w-2/3" /></div></div>))}</div>
           ) : filteredChats.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-16 px-6 text-center">
-              <div className="w-16 h-16 bg-bg flex items-center justify-center mb-4"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg></div>
-              <h3 className="text-sm font-semibold text-text-1 mb-1">No chats yet</h3>
-              <p className="text-xs text-text-2">New leads will appear here when assigned</p>
+              <div className="w-16 h-16 bg-bg flex items-center justify-center mb-4 rounded-2xl border border-border"><svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg></div>
+              <h3 className="text-sm font-bold text-text-1 mb-1">No chats yet</h3>
+              <p className="text-xs text-text-3 leading-relaxed">New leads will appear here when assigned</p>
             </div>
           ) : (
             <ChatList chats={filteredChats} activeChatId={activeChat?._id} onSelectChat={handleSelectChat} user={user} />
@@ -302,15 +313,17 @@ const AgentDashboard = () => {
       </div>
 
       {/* Right Side */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
+        !activeChat ? 'hidden md:flex' : 'flex'
+      }`}>
         {activeChat ? (
           <div className="h-full"><ChatScreen chatId={activeChat._id} onBack={() => setActiveChat(null)} onMenuClick={() => {}} /></div>
         ) : (
           <div className="flex-1 flex items-center justify-center h-full bg-bg">
-            <div className="text-center">
-              <div className="w-24 h-24 bg-primary-light flex items-center justify-center mx-auto mb-5"><svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg></div>
-              <h3 className="text-lg font-bold text-text-1 mb-1">Select a conversation</h3>
-              <p className="text-sm text-text-3">Choose a chat from the sidebar to start helping</p>
+            <div className="text-center animate-fade-in select-none">
+              <div className="w-24 h-24 bg-primary/10 rounded-3xl flex items-center justify-center mx-auto mb-5 border border-primary/20" style={{ backgroundColor: `rgba(var(--primary), 0.1)` }}><svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ color: 'var(--primary)' }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg></div>
+              <h3 className="text-base font-extrabold text-text-1 mb-1 tracking-wide uppercase">Select a conversation</h3>
+              <p className="text-xs text-text-3 font-semibold mt-1">Choose a chat from the sidebar to start helping clients</p>
             </div>
           </div>
         )}
@@ -318,12 +331,12 @@ const AgentDashboard = () => {
 
       {/* Profile Settings Modal */}
       {showProfileModal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-surface max-w-sm w-full p-6 shadow-float border border-border">
-            <h2 className="text-lg font-bold text-text-1 mb-4">Edit Profile</h2>
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="bg-surface max-w-sm w-full p-6 shadow-float border border-border rounded-2xl animate-scale-in">
+            <h2 className="text-base font-extrabold text-text-1 mb-4 uppercase tracking-wide">Edit Profile</h2>
             <form onSubmit={handleProfileSave} className="space-y-4">
               <div className="flex flex-col items-center gap-3">
-                <div className="w-20 h-20 bg-bg border border-border flex items-center justify-center overflow-hidden relative">
+                <div className="w-20 h-20 bg-bg border border-border flex items-center justify-center overflow-hidden relative rounded-full shadow-inner">
                   {profileAvatar ? (
                     <img src={profileAvatar} alt="Avatar Preview" className="w-full h-full object-cover" />
                   ) : (
@@ -335,57 +348,58 @@ const AgentDashboard = () => {
                     </div>
                   )}
                 </div>
-                <label className="text-xs text-primary hover:text-primary-hover font-semibold cursor-pointer">
+                <label className="text-xs text-primary hover:text-primary-hover font-bold cursor-pointer uppercase tracking-wider">
                   {uploadingAvatar ? 'Uploading...' : 'Change Photo'}
                   <input type="file" accept="image/*" className="hidden" onChange={handleAvatarChange} disabled={uploadingAvatar} />
                 </label>
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-2 mb-1">Full Name</label>
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-text-2 mb-1.5">Full Name</label>
                 <input
                   type="text"
                   required
                   value={profileName}
                   onChange={(e) => setProfileName(e.target.value)}
-                  className="input-field w-full text-sm"
+                  className="w-full border border-border rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary transition-all font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-2 mb-1">Mobile Number (Login ID)</label>
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-text-2 mb-1.5">Mobile Number (Login ID)</label>
                 <input
                   type="text"
                   disabled
                   value={user?.mobile || ''}
-                  className="input-field w-full text-sm bg-bg text-text-3 cursor-not-allowed"
+                  className="w-full border border-border rounded-xl px-3.5 py-2 text-sm bg-bg text-text-3 cursor-not-allowed font-medium"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-text-2 mb-1">Assigned Categories</label>
+                <label className="block text-[10px] font-extrabold uppercase tracking-wider text-text-2 mb-1.5">Assigned Categories</label>
                 <input
                   type="text"
                   disabled
                   value={agentIssueTypes.length > 0 ? agentIssueTypes.join(', ').toUpperCase() : 'ALL CATEGORIES'}
-                  className="input-field w-full text-sm bg-bg text-text-3 cursor-not-allowed"
+                  className="w-full border border-border rounded-xl px-3.5 py-2 text-sm bg-bg text-text-3 cursor-not-allowed font-semibold text-xs"
                 />
               </div>
 
-              <div className="flex justify-end gap-2 pt-2 border-t border-border">
+              <div className="flex justify-end gap-2.5 pt-4 border-t border-border mt-5">
                 <button
                   type="button"
                   onClick={() => setShowProfileModal(false)}
-                  className="px-4 py-2 border border-border text-sm hover:bg-bg transition-colors"
+                  className="px-4 py-2 border border-border text-xs font-bold text-text-2 hover:text-text-1 hover:bg-bg transition-colors rounded-xl cursor-pointer bg-transparent"
                 >
-                  Cancel
+                  CANCEL
                 </button>
                 <button
                   type="submit"
                   disabled={uploadingAvatar}
-                  className="px-4 py-2 bg-primary hover:bg-primary-hover text-white text-sm font-semibold transition-colors disabled:opacity-50"
+                  className="px-4 py-2 bg-primary hover:bg-primary/95 text-white text-xs font-bold transition-colors disabled:opacity-50 rounded-xl cursor-pointer"
+                  style={{ backgroundColor: 'var(--primary)' }}
                 >
-                  Save Changes
+                  SAVE CHANGES
                 </button>
               </div>
             </form>

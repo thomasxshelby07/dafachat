@@ -110,6 +110,34 @@ router.get('/agents/activity', auth, isManagerOrAbove, async (req, res) => {
   }
 });
 
+// GET /agents/activity-history — Get historical agent activity/break logs
+router.get('/agents/activity-history', auth, isManagerOrAbove, async (req, res) => {
+  try {
+    const { userId, date, startDate, endDate } = req.query;
+    const query = {};
+
+    if (userId) {
+      query.userId = userId;
+    }
+    if (date) {
+      query.date = date; // Format YYYY-MM-DD
+    } else if (startDate || endDate) {
+      query.date = {};
+      if (startDate) query.date.$gte = startDate;
+      if (endDate) query.date.$lte = endDate;
+    }
+
+    const AgentActivityLog = require('../models/AgentActivityLog');
+    const logs = await AgentActivityLog.find(query)
+      .populate('userId', 'fullName mobile avatar status')
+      .sort({ date: -1, createdAt: -1 });
+
+    res.json({ logs });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to fetch agent activity history' });
+  }
+});
+
 // Force status override by Manager
 router.patch('/:id/status/force', auth, isManagerOrAbove, async (req, res) => {
   try {

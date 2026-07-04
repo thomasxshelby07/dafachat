@@ -51,24 +51,24 @@ const SmartEntry = () => {
     border: isDarkCard ? '1px solid rgba(251, 191, 36, 0.15)' : '1px solid rgba(0,0,0,0.06)',
   };
 
-  const mobileInputCls = `flex-1 border-[1.5px] rounded-r-xl px-3 py-2 text-sm font-normal min-h-[38px] outline-none transition-all ${
+  const mobileInputCls = `flex-1 border-[1.5px] rounded-r-xl px-3.5 py-2.5 text-sm font-normal min-h-[42px] outline-none transition-all duration-300 ${
     isDarkCard
-      ? 'bg-red-950/20 border-amber-500/20 text-white placeholder-amber-500/30 focus:border-amber-400'
-      : 'bg-bg border-border text-text-1 placeholder-text-3 focus:border-primary'
+      ? 'bg-black/25 border-white/10 text-white placeholder-white/30 focus:border-amber-400 focus:bg-black/40 focus:ring-1 focus:ring-amber-400/20'
+      : 'bg-slate-50 border-slate-200 text-text-1 placeholder-text-3 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20'
   }`;
 
-  const textInputCls = `w-full border-[1.5px] rounded-xl px-3 py-2 text-sm font-normal min-h-[38px] outline-none transition-all ${
+  const textInputCls = `w-full border-[1.5px] rounded-xl px-3.5 py-2.5 text-sm font-normal min-h-[42px] outline-none transition-all duration-300 ${
     isDarkCard
-      ? 'bg-red-950/20 border-amber-500/20 text-white placeholder-amber-500/30 focus:border-amber-400'
-      : 'bg-bg border-border text-text-1 placeholder-text-3 focus:border-primary'
+      ? 'bg-black/25 border-white/10 text-white placeholder-white/30 focus:border-amber-400 focus:bg-black/40 focus:ring-1 focus:ring-amber-400/20'
+      : 'bg-slate-50 border-slate-200 text-text-1 placeholder-text-3 focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary/20'
   }`;
 
   const labelCls = `block text-xs font-semibold uppercase tracking-wider mb-1.5 ${isDarkCard ? 'text-amber-400' : 'text-text-1'}`;
 
-  const cardButtonCls = `w-full flex items-center p-3 rounded-2xl transition-all duration-300 border outline-none text-left cursor-pointer group transform hover:scale-[1.02] hover:shadow-md active:scale-[0.98] ${
+  const cardButtonCls = `w-full flex items-center p-4 rounded-2xl transition-all duration-300 border outline-none text-left cursor-pointer group transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] ${
     isDarkCard
-      ? 'bg-red-950/30 border-amber-500/20 hover:bg-red-950/45 hover:border-amber-500/40 text-slate-100'
-      : 'bg-slate-50 border-slate-200 hover:bg-slate-100 hover:border-slate-300 text-slate-700'
+      ? 'bg-white/[0.03] border-white/10 hover:bg-white/[0.08] hover:border-amber-400/30 text-slate-100 shadow-sm'
+      : 'bg-white border-slate-200/80 hover:bg-slate-50 hover:border-primary/30 text-slate-700 shadow-sm'
   }`;
 
   const iconCls = `w-5 h-5 transition-colors ${
@@ -279,8 +279,8 @@ const SmartEntry = () => {
                 <div>
                   <label htmlFor="lead-mobile" className={labelCls}>Mobile Number</label>
                   <div className="flex">
-                    <span className={`inline-flex items-center px-3 rounded-l-xl border-[1.5px] border-r-0 text-sm font-semibold select-none ${
-                      isDarkCard ? 'bg-red-950/20 border-amber-500/20 text-amber-400' : 'bg-slate-50 border-border text-text-3'
+                    <span className={`inline-flex items-center px-3.5 rounded-l-xl border-[1.5px] border-r-0 text-sm font-semibold select-none ${
+                      isDarkCard ? 'bg-black/45 border-white/10 text-amber-400' : 'bg-slate-100 border-slate-200 text-text-3'
                     }`}>+91</span>
                     <input
                       id="lead-mobile"
@@ -369,8 +369,8 @@ const SmartEntry = () => {
                 <div>
                   <label htmlFor="existing-mobile" className={labelCls}>Registered Mobile Number</label>
                   <div className="flex">
-                    <span className={`inline-flex items-center px-3 rounded-l-xl border-[1.5px] border-r-0 text-sm font-semibold select-none ${
-                      isDarkCard ? 'bg-red-950/20 border-amber-500/20 text-amber-400' : 'bg-slate-50 border-border text-text-3'
+                    <span className={`inline-flex items-center px-3.5 rounded-l-xl border-[1.5px] border-r-0 text-sm font-semibold select-none ${
+                      isDarkCard ? 'bg-black/45 border-white/10 text-amber-400' : 'bg-slate-100 border-slate-200 text-text-3'
                     }`}>+91</span>
                     <input
                       id="existing-mobile"

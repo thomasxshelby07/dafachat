@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
 const roleLabels = {
@@ -15,7 +15,7 @@ const roleColors = {
   customer: 'bg-gray-100 text-gray-700',
 };
 
-const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImageClick, onChatWithSupportClick }) => {
+const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImageClick, onChatWithSupportClick, onReply }) => {
   const [showMenu, setShowMenu] = useState(false);
 
   const formatTime = (date) => {
@@ -294,16 +294,30 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
 
   return (
     <motion.div
+      id={`msg-${message._id}`}
       initial={{ opacity: 0, y: 10, scale: 0.97 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
       transition={{ type: 'spring', stiffness: 400, damping: 30 }}
       className={`flex ${isOwn ? 'justify-end' : 'justify-start'} px-3.5 py-0.5 group`}
       onMouseLeave={() => setShowMenu(false)}
     >
-      <div className="relative max-w-[80%]">
+      <div className="flex items-center gap-2 max-w-[85%] relative">
+        {isOwn && onReply && (
+          <button
+            onClick={onReply}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-bg text-text-3 hover:text-primary order-first shrink-0 bg-transparent border-0 cursor-pointer"
+            title="Reply"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 transform -scale-x-100" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+          </button>
+        )}
+
         <div
+          onDoubleClick={onReply}
           className={`
-            px-3.5 py-2
+            px-3.5 py-2 relative
             ${isOwn
               ? 'text-white rounded-2xl rounded-tr-sm shadow-sm'
               : 'bg-bubble-customer text-bubble-customer-text border border-border/80 rounded-2xl rounded-tl-sm shadow-sm'
@@ -311,6 +325,32 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
           `}
           style={isOwn ? { backgroundColor: 'var(--primary)' } : {}}
         >
+          {message.replyTo && (
+            <div 
+              onClick={(e) => {
+                e.stopPropagation();
+                const el = document.getElementById(`msg-${message.replyTo._id}`);
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                  el.classList.add('bg-primary/20', 'transition-all', 'duration-500');
+                  setTimeout(() => el.classList.remove('bg-primary/20'), 1500);
+                }
+              }}
+              className={`mb-1.5 p-2 rounded text-[11px] border-l-2 text-left cursor-pointer transition-colors ${
+                isOwn 
+                  ? 'bg-black/15 border-white/50 text-white/90 hover:bg-black/20' 
+                  : 'bg-bg border-primary/50 text-text-2 hover:bg-bg/85'
+              }`}
+            >
+              <div className="font-bold truncate">
+                {message.replyTo.senderName || (message.replyTo.senderRole === 'customer' ? 'Customer' : 'Agent')}
+              </div>
+              <div className="truncate opacity-80 mt-0.5">
+                {message.replyTo.content || (message.replyTo.type === 'image' ? '📷 Image' : message.replyTo.type === 'audio' ? '🎤 Voice note' : '📎 File')}
+              </div>
+            </div>
+          )}
+
           {renderMedia()}
           {message.senderRole && viewerRole !== 'customer' && message.senderRole !== 'customer' && (
             <div className={`mb-0.5 ${isOwn ? 'text-right' : ''}`}>
@@ -337,35 +377,47 @@ const ChatBubble = ({ message, isOwn, viewerRole = 'customer', onDelete, onImage
             </span>
             {renderStatus(message.status)}
           </div>
+
+          {canDelete && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setShowMenu(!showMenu); }}
+              className={`absolute top-1 ${isOwn ? '-left-7' : '-right-7'} opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-bg bg-transparent border-0 cursor-pointer`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+              </svg>
+            </button>
+          )}
+
+          {showMenu && (
+            <div className={`absolute top-0 ${isOwn ? 'right-0 mr-1' : 'left-0 ml-1'} bg-surface border border-border rounded-lg shadow-float z-30 py-1 min-w-[100px]`}>
+              <button
+                onClick={(e) => { e.stopPropagation(); setShowMenu(false); onDelete(message._id); }}
+                className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2 bg-transparent border-0 cursor-pointer"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                </svg>
+                Delete
+              </button>
+            </div>
+          )}
         </div>
 
-        {canDelete && (
+        {!isOwn && onReply && (
           <button
-            onClick={() => setShowMenu(!showMenu)}
-            className={`absolute top-1 ${isOwn ? '-left-7' : '-right-7'} opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-full hover:bg-bg`}
+            onClick={onReply}
+            className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-full hover:bg-bg text-text-3 hover:text-primary shrink-0 bg-transparent border-0 cursor-pointer"
+            title="Reply"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-text-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
             </svg>
           </button>
-        )}
-
-        {showMenu && (
-          <div className={`absolute top-0 ${isOwn ? 'right-0 mr-1' : 'left-0 ml-1'} bg-surface border border-border rounded-lg shadow-float z-30 py-1 min-w-[100px]`}>
-            <button
-              onClick={() => { setShowMenu(false); onDelete(message._id); }}
-              className="w-full px-3 py-2 text-left text-sm text-danger hover:bg-danger/10 flex items-center gap-2"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Delete
-            </button>
-          </div>
         )}
       </div>
     </motion.div>
   );
 };
 
-export default ChatBubble;
+export default React.memo(ChatBubble);
