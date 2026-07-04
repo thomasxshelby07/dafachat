@@ -190,15 +190,6 @@ const findBestAgent = async (issueType) => {
       }).select('_id fullName status permissions role');
     }
 
-    // Step 3: Look for any active, online AGENTS who DO NOT have 'new_id' permission
-    if (candidates.length === 0) {
-      candidates = await User.find({
-        role: 'agent',
-        isActive: true,
-        status: 'online',
-        'permissions.issueTypes': { $ne: 'new_id' }
-      }).select('_id fullName status permissions role');
-    }
 
     // Step 4: If no active, online AGENTS are available, look for active, online MANAGERS specializing in issueType
     if (candidates.length === 0) {
@@ -225,15 +216,6 @@ const findBestAgent = async (issueType) => {
       }).select('_id fullName status permissions role');
     }
 
-    // Step 6: Look for any active, online MANAGERS who DO NOT have 'new_id' permission
-    if (candidates.length === 0) {
-      candidates = await User.find({
-        role: 'manager',
-        isActive: true,
-        status: 'online',
-        'permissions.issueTypes': { $ne: 'new_id' }
-      }).select('_id fullName status permissions role');
-    }
 
     // Step 7: Fallback to active, online SUPER ADMINS if absolutely nobody else is available (who don't have 'new_id' exclusively)
     if (candidates.length === 0) {
