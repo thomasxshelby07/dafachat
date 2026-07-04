@@ -470,6 +470,21 @@ const CustomerDashboard = () => {
         </div>
       )}
 
+      {startingChat && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex flex-col items-center justify-center p-4">
+          <div className="bg-surface border border-border rounded-2xl p-6 max-w-xs w-full text-center shadow-2xl animate-scale-in">
+            <div className="relative w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <span className="animate-ping absolute inline-flex h-12 w-12 rounded-full bg-primary/20 opacity-75" style={{ backgroundColor: `${branding.primaryColor || '#B91C1C'}20` }} />
+              <div className="w-12 h-12 rounded-full border-4 border-border border-t-primary animate-spin" style={{ borderTopColor: branding.primaryColor || '#B91C1C' }} />
+            </div>
+            <h3 className="text-sm font-extrabold text-text-1 mb-1.5 uppercase tracking-wider">Connecting to Agent</h3>
+            <p className="text-[11px] text-text-3 font-semibold font-hindi" style={{ color: branding.primaryColor || '#B91C1C' }}>
+              कृपया प्रतीक्षा करें, हम आपको सपोर्ट एजेंट से जोड़ रहे हैं...
+            </p>
+          </div>
+        </div>
+      )}
+
       {showNotificationPrompt && (
         <div className="bg-primary text-white px-4 py-3 flex items-center justify-between gap-3 text-xs md:text-sm font-semibold select-none shadow-md" style={{ backgroundColor: branding.primaryColor || '#B91C1C' }}>
           <div className="flex items-center gap-2">
@@ -526,15 +541,46 @@ const CustomerDashboard = () => {
         {showFallbackSelector ? (
           <div className="px-4 pt-6">
             <div className="mb-5">
-              <h2 className="text-base font-bold text-text-1 mb-1 flex items-center gap-1.5 text-warning" style={{ color: branding.primaryColor || '#B91C1C' }}>
-                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <h2 className="text-base font-bold text-text-1 mb-1.5 flex items-center gap-1.5 text-warning" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                <svg className="w-5 h-5 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
-                {pendingIssueType.toUpperCase()} Team is Offline
+                {pendingIssueType === 'new_id' ? 'ID TEAM' : pendingIssueType.toUpperCase() + ' TEAM'} IS OFFLINE
               </h2>
-              <p className="text-xs text-text-2 leading-relaxed">
-                All our {pendingIssueType} experts are currently busy or offline. You can connect and chat with one of our other active online agents below:
-              </p>
+              <div className="space-y-1.5 text-xs text-text-2 leading-relaxed">
+                {pendingIssueType === 'new_id' && (
+                  <>
+                    <p className="font-semibold text-text-1">All our ID creation specialists are currently busy or offline.</p>
+                    <p className="font-semibold text-primary font-mono text-[11px]" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                      अभी न्यू आईडी टीम ऑफलाइन है, आप नीचे वाले एक्टिव एजेंट से कनेक्ट कर सकते हैं।
+                    </p>
+                  </>
+                )}
+                {pendingIssueType === 'deposit' && (
+                  <>
+                    <p className="font-semibold text-text-1">All our Deposit experts are currently busy or offline.</p>
+                    <p className="font-semibold text-primary font-mono text-[11px]" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                      अभी डिपाजिट टीम ऑफलाइन है, आप नीचे वाले एक्टिव एजेंट से कनेक्ट कर सकते हैं।
+                    </p>
+                  </>
+                )}
+                {pendingIssueType === 'withdrawal' && (
+                  <>
+                    <p className="font-semibold text-text-1">All our Withdrawal experts are currently busy or offline.</p>
+                    <p className="font-semibold text-primary font-mono text-[11px]" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                      अभी विथड्रॉल टीम ऑफलाइन है, आप नीचे वाले एक्टिव एजेंट से कनेक्ट कर सकते हैं।
+                    </p>
+                  </>
+                )}
+                {pendingIssueType !== 'new_id' && pendingIssueType !== 'deposit' && pendingIssueType !== 'withdrawal' && (
+                  <>
+                    <p className="font-semibold text-text-1">Our support experts for this category are currently busy or offline.</p>
+                    <p className="font-semibold text-primary font-mono text-[11px]" style={{ color: branding.primaryColor || '#B91C1C' }}>
+                      अभी सपोर्ट टीम ऑफलाइन है, आप नीचे वाले एक्टिव एजेंट से कनेक्ट कर सकते हैं।
+                    </p>
+                  </>
+                )}
+              </div>
             </div>
             <div className="space-y-3 max-h-[360px] overflow-y-auto pr-1">
               {fallbackAgents.map(ag => (
@@ -801,13 +847,25 @@ const CustomerDashboard = () => {
                       <button
                         onClick={handleManualIdStart}
                         disabled={startingChat}
-                        className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md"
+                        className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md animate-pulse"
                         style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
                       >
-                        <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
-                        <span>Chat with New ID Team</span>
+                        {startingChat ? (
+                          <>
+                            <svg className="animate-spin h-4.5 w-4.5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                            </svg>
+                            <span>Connecting to Agent...</span>
+                          </>
+                        ) : (
+                          <>
+                            <svg className="w-4.5 h-4.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                            </svg>
+                            <span>Chat with New ID Team</span>
+                          </>
+                        )}
                       </button>
                     </div>
                   )
@@ -831,10 +889,22 @@ const CustomerDashboard = () => {
                       className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md"
                       style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
                     >
-                      <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      <span>Chat with Support Agent</span>
+                      {startingChat ? (
+                        <>
+                          <svg className="animate-spin h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span>Connecting to Agent...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-4 h-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                          <span>Chat with Support Agent</span>
+                        </>
+                      )}
                     </button>
                     
                     <button
@@ -874,10 +944,22 @@ const CustomerDashboard = () => {
                       className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-xs tracking-wider uppercase shadow-md"
                       style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
                     >
-                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                      <span>CHAT WITH NEW ID TEAM</span>
+                      {startingChat ? (
+                        <>
+                          <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                          </svg>
+                          <span>Connecting to Agent...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                          </svg>
+                          <span>CHAT WITH NEW ID TEAM</span>
+                        </>
+                      )}
                     </button>
                     
                     {/* Auto ID Button */}
@@ -901,8 +983,20 @@ const CustomerDashboard = () => {
                   className="w-full text-white font-extrabold py-3 px-4 rounded-full transition-all duration-300 transform hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2 border-0 cursor-pointer text-sm tracking-wider uppercase shadow-md"
                   style={{ background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})` }}
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                  Start New Chat
+                  {startingChat ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                      <span>Connecting to Agent...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                      <span>Start New Chat</span>
+                    </>
+                  )}
                 </button>
               </div>
             )}
