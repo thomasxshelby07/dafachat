@@ -33,6 +33,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
   const [forwardChatsLoading, setForwardChatsLoading] = useState(false);
   const [selectedForwardChatIds, setSelectedForwardChatIds] = useState([]);
   const [forwardSearch, setForwardSearch] = useState('');
+  const [showReconnectModal, setShowReconnectModal] = useState(false);
 
   const handleOpenForward = async (msg) => {
     setForwardingMessage(msg);
@@ -69,7 +70,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
   };
 
   useEffect(() => {
-    if (user?.role === 'customer' && chat?.agentId && (chat.agentId.status === 'offline' || chat.agentId.status === 'break')) {
+    if (user?.role === 'customer' && (!chat?.agentId || chat.agentId.status === 'offline' || chat.agentId.status === 'break')) {
       const fetchOnlineAgents = async () => {
         setLoadingOnlineAgents(true);
         try {
@@ -83,7 +84,7 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
       };
       fetchOnlineAgents();
     }
-  }, [chat?.agentId?.status, user?.role, chatId]);
+  }, [chat?.agentId, chat?.agentId?.status, user?.role, chatId]);
 
   useEffect(() => {
     if (!chatId) return;
@@ -482,63 +483,35 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
           <div ref={messagesEndRef} />
         </div>
 
-        {user?.role === 'customer' && chat?.agentId && (chat.agentId.status === 'offline' || chat.agentId.status === 'break') ? (
+        {user?.role === 'customer' && (!chat?.agentId || chat.agentId.status === 'offline' || chat.agentId.status === 'break') ? (
           <div className="bg-surface border-t border-border p-4 space-y-3">
             <div className="bg-warning/10 border border-warning/30 text-warning px-3.5 py-3 rounded-lg text-xs flex gap-2.5 items-start">
               <svg className="w-5 h-5 text-warning shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
               </svg>
-              <div className="space-y-1">
-                <p className="font-semibold text-text-1">This agent is offline/on break right now. You can connect with other active agents below:</p>
-                <p className="font-semibold font-hindi text-text-1">यह एजेंट अभी ऑफलाइन/ब्रेक पर है। आप नीचे दिए गए सक्रिय (ऑनलाइन) एजेंटों से जुड़ सकते हैं:</p>
+              <div className="space-y-1 flex-1">
+                {chat?.agentId ? (
+                  <>
+                    <p className="font-semibold text-text-1">This agent is offline/on break right now.</p>
+                    <p className="font-semibold font-hindi text-text-1">यह एजेंट अभी ऑफलाइन/ब्रेक पर है।</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold text-text-1">No agent is currently assigned to this chat.</p>
+                    <p className="font-semibold font-hindi text-text-1">कोई एजेंट अभी असाइन नहीं है।</p>
+                  </>
+                )}
+                <button
+                  onClick={() => setShowReconnectModal(true)}
+                  className="mt-2.5 w-full flex items-center justify-center gap-1.5 px-3.5 py-2.5 bg-warning text-white text-xs font-extrabold uppercase rounded-xl hover:brightness-110 active:scale-95 transition-all shadow-sm border-0 cursor-pointer"
+                  style={{ background: 'linear-gradient(135deg, #F59E0B, #D97706)' }}
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" />
+                  </svg>
+                  <span>Reconnect with Active Agent / दूसरे एजेंट से जुड़ें</span>
+                </button>
               </div>
-            </div>
-            
-            <div className="space-y-2 max-h-56 overflow-y-auto">
-              {loadingOnlineAgents ? (
-                <div className="text-center text-xs text-text-3 py-4">Checking online agents...</div>
-              ) : onlineAgents.length === 0 ? (
-                <div className="text-center text-xs text-text-3 py-4 italic">No other agents are online right now. DAFA SUPPORT will assist you shortly.</div>
-              ) : (
-                onlineAgents.map(ag => (
-                  <div key={ag._id} className="flex items-center justify-between p-2.5 bg-bg/50 border border-border rounded-lg hover:bg-bg/85 transition-all">
-                    <div className="flex items-center gap-3">
-                      {ag.avatar ? (
-                        <img src={ag.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-success/30" />
-                      ) : (
-                        <div className="w-9 h-9 bg-primary text-white text-xs font-bold rounded-full flex items-center justify-center">
-                          {ag.fullName?.charAt(0)}
-                        </div>
-                      )}
-                      <div>
-                        <div className="text-xs font-bold text-text-1">{ag.fullName}</div>
-                        <div className="flex flex-wrap gap-1 mt-0.5">
-                          {(ag.permissions?.issueTypes && ag.permissions.issueTypes.length > 0 ? ag.permissions.issueTypes : ['deposit', 'withdrawal', 'other']).map(tag => (
-                            <span key={tag} className="px-1.5 py-0.2 bg-primary/10 text-primary text-[8px] font-bold uppercase rounded">
-                              {tag}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-                    
-                    <button
-                      onClick={async () => {
-                        try {
-                          await api.post(`/api/chats/${chatId}/transfer-self`, { agentId: ag._id });
-                          const chatRes = await api.get(`/api/chats/${chatId}`);
-                          setChat(chatRes.data.chat);
-                        } catch (e) {
-                          alert('Failed to connect to agent');
-                        }
-                      }}
-                      className="px-3 py-1.5 bg-primary text-white text-xs font-bold rounded-md hover:bg-primary-dark transition-all"
-                    >
-                      Connect / मुझे इससे बात करनी है
-                    </button>
-                  </div>
-                ))
-              )}
             </div>
           </div>
         ) : (
@@ -779,6 +752,87 @@ const ChatScreen = ({ chatId, onBack, onMenuClick, onChatWithSupportClick }) => 
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {showReconnectModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-surface border border-border w-full max-w-sm rounded-xl p-5 shadow-float text-xs flex flex-col max-h-[85vh] animate-scale-in">
+            <div className="flex items-center justify-between mb-2">
+              <h4 className="text-sm font-extrabold text-text-1 uppercase tracking-wide">Connect with Online Agent</h4>
+              <button 
+                onClick={() => setShowReconnectModal(false)}
+                className="text-text-3 hover:text-text-1 bg-transparent border-0 cursor-pointer"
+              >
+                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <p className="text-text-3 mb-4 font-semibold font-hindi text-[10px]">सक्रिय सपोर्ट एजेंटों की सूची नीचे दी गई है:</p>
+
+            <div className="flex-1 overflow-y-auto space-y-2.5 mb-4 max-h-[320px] pr-1">
+              {loadingOnlineAgents ? (
+                <div className="text-center py-6 text-text-3 font-semibold">Checking online agents...</div>
+              ) : onlineAgents.length === 0 ? (
+                <div className="text-center py-8 text-text-3 italic font-semibold leading-relaxed">
+                  ⚠️ No other agents are online right now.<br />
+                  Our team will assist you shortly.
+                </div>
+              ) : (
+                onlineAgents.map(ag => (
+                  <div 
+                    key={ag._id} 
+                    className="flex items-center justify-between p-3 bg-bg/50 border border-border/80 rounded-xl hover:bg-bg transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {ag.avatar ? (
+                        <img src={ag.avatar} alt="" className="w-9 h-9 rounded-full object-cover border border-success/30" />
+                      ) : (
+                        <div className="w-9 h-9 bg-primary/10 text-primary text-xs font-bold rounded-full flex items-center justify-center border border-primary/20">
+                          {ag.fullName?.charAt(0)}
+                        </div>
+                      )}
+                      <div>
+                        <div className="text-xs font-extrabold text-text-1">{ag.fullName}</div>
+                        <div className="flex flex-wrap gap-1 mt-1">
+                          {(ag.permissions?.issueTypes && ag.permissions.issueTypes.length > 0 ? ag.permissions.issueTypes : ['deposit', 'withdrawal', 'other']).map(tag => (
+                            <span key={tag} className="px-1.5 py-0.2 bg-primary/10 text-primary text-[8px] font-extrabold uppercase rounded">
+                              {tag}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <button
+                      onClick={async () => {
+                        try {
+                          await api.post(`/api/chats/${chatId}/transfer-self`, { agentId: ag._id });
+                          const chatRes = await api.get(`/api/chats/${chatId}`);
+                          setChat(chatRes.data.chat);
+                          setShowReconnectModal(false);
+                        } catch (e) {
+                          alert('Failed to connect to agent');
+                        }
+                      }}
+                      className="px-3 py-1.5 bg-primary text-white text-[10px] font-extrabold uppercase rounded-lg shadow-sm hover:brightness-110 active:scale-95 transition-all border-0 cursor-pointer"
+                      style={{ backgroundColor: 'var(--primary)', borderColor: 'var(--primary)' }}
+                    >
+                      Connect
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+
+            <button
+              onClick={() => setShowReconnectModal(false)}
+              className="btn-secondary w-full py-2 rounded-xl font-bold cursor-pointer"
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

@@ -288,28 +288,6 @@ async function handleAgentGoesBreak(user, io) {
   for (const lead of activeLeads) {
     const leadIdStr = lead._id.toString();
 
-    // Check if lead has pending messages from the customer (status !== 'read')
-    let hasPendingMessages = false;
-    if (lead.chatId) {
-      try {
-        const Message = require('../models/Message');
-        const unreadExists = await Message.exists({
-          chatId: lead.chatId,
-          senderRole: 'customer',
-          status: { $ne: 'read' }
-        });
-        hasPendingMessages = !!unreadExists;
-      } catch (err) {
-        logger.error('Error checking unread messages:', err);
-      }
-    }
-
-    // Only reassign if there are pending messages from the customer!
-    if (!hasPendingMessages) {
-      logger.info(`Lead ${leadIdStr} has no pending customer messages. Skipping timeout grace period.`);
-      continue;
-    }
-
     // Clear existing timer if any
     if (reassignmentTimers[leadIdStr]) {
       clearTimeout(reassignmentTimers[leadIdStr]);

@@ -436,6 +436,16 @@ io.on('connection', async (socket) => {
 
         if (userRole === 'customer') {
           await notifyAgentNewMessage(chat, message, socket.user);
+          if (chat.agentId) {
+            const agent = await User.findById(chat.agentId);
+            if (agent && (agent.status === 'offline' || agent.status === 'break')) {
+              const { triggerGracePeriodForLead } = require('./utils/activitySystem');
+              const leadObj = await Lead.findOne({ chatId: chat._id });
+              if (leadObj) {
+                triggerGracePeriodForLead(leadObj, agent, io);
+              }
+            }
+          }
         } else {
           await notifyCustomerNewMessage(chat, message, socket.user);
         }

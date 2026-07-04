@@ -377,13 +377,16 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
               </span>
             </div>
           )}
-          <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide py-1 w-full">
+          <div 
+            className="flex items-center gap-1.5 overflow-x-auto py-1 w-full flex-nowrap [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             {Object.entries(statusConfig).map(([key, config]) => (
               <button
                 key={key}
                 onClick={() => handleStatusUpdate(key)}
                 disabled={updatingStatus}
-                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all whitespace-nowrap flex items-center gap-1 ${
+                className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all whitespace-nowrap flex-shrink-0 flex items-center gap-1.5 ${
                   leadStatus === key
                     ? config.color
                     : 'bg-bg text-text-2 hover:bg-border border border-transparent'

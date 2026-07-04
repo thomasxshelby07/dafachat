@@ -190,7 +190,7 @@ const AgentDashboard = () => {
   return (
     <div className="h-screen flex bg-bg overflow-hidden relative">
       {/* Sidebar */}
-      <div className={`w-full md:w-[280px] bg-surface border-r border-border flex flex-col flex-shrink-0 transition-all duration-300 ${
+      <div className={`w-full md:w-[320px] bg-surface border-r border-border flex flex-col flex-shrink-0 transition-all duration-300 ${
         activeChat ? 'hidden md:flex' : 'flex'
       }`}>
         {/* Agent Header */}
@@ -273,7 +273,10 @@ const AgentDashboard = () => {
         </div>
 
         {/* Filter Tabs */}
-        <div className="flex gap-1.5 px-3.5 py-2 border-b border-border overflow-x-auto scrollbar-none bg-surface/50">
+        <div 
+          className="flex gap-1.5 px-3.5 py-2 border-b border-border overflow-x-auto bg-surface/50 flex-nowrap whitespace-nowrap [&::-webkit-scrollbar]:hidden"
+          style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+        >
           {[
             { key: 'all', label: 'All' },
             { key: 'active', label: 'Active', count: activeChatsCount },
@@ -284,7 +287,7 @@ const AgentDashboard = () => {
             <button 
               key={key} 
               onClick={() => setFilter(key)} 
-              className={`px-3.5 py-1.5 text-[10px] font-extrabold rounded-full transition-all whitespace-nowrap cursor-pointer border ${
+              className={`px-3.5 py-1.5 text-[10px] font-extrabold rounded-full transition-all whitespace-nowrap flex-shrink-0 cursor-pointer border ${
                 filter === key 
                   ? 'bg-primary text-white border-primary shadow-sm hover:brightness-110' 
                   : 'bg-bg text-text-2 hover:text-text-1 border-border/80 hover:border-border'
