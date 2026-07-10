@@ -409,21 +409,29 @@ io.on('connection', async (socket) => {
           }
         }
 
-        if (userRole === 'customer') {
-          await notifyAgentNewMessage(chat, message, socket.user);
-          if (chat.agentId) {
-            const agent = await User.findById(chat.agentId);
-            if (agent && (agent.status === 'offline' || agent.status === 'break')) {
-              const { triggerGracePeriodForLead } = require('./utils/activitySystem');
-              const leadObj = await Lead.findOne({ chatId: chat._id });
-              if (leadObj) {
-                triggerGracePeriodForLead(leadObj, agent, io);
+        // Process notifications and lead assignment checks asynchronously in the background
+        // to avoid blocking the message delivery and ensure instant client confirmation.
+        (async () => {
+          try {
+            if (userRole === 'customer') {
+              await notifyAgentNewMessage(chat, message, socket.user);
+              if (chat.agentId) {
+                const agent = await User.findById(chat.agentId);
+                if (agent && (agent.status === 'offline' || agent.status === 'break')) {
+                  const { triggerGracePeriodForLead } = require('./utils/activitySystem');
+                  const leadObj = await Lead.findOne({ chatId: chat._id });
+                  if (leadObj) {
+                    triggerGracePeriodForLead(leadObj, agent, io);
+                  }
+                }
               }
+            } else {
+              await notifyCustomerNewMessage(chat, message, socket.user);
             }
+          } catch (err) {
+            logger.error('Background message processing error:', err);
           }
-        } else {
-          await notifyCustomerNewMessage(chat, message, socket.user);
-        }
+        })();
 
         socket.to('staff_room').emit('new_message', messageObj);
       }
