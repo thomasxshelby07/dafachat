@@ -226,7 +226,12 @@ const ChatHeader = ({ chat, user, onBack, onMenuClick, onCustomerClick, onToggle
   };
 
   return (
-    <div className="bg-surface border-b border-border sticky top-0 z-10">
+    <div 
+      className="bg-surface border-b border-border sticky top-0 z-10"
+      style={{
+        paddingTop: 'env(safe-area-inset-top, 0px)'
+      }}
+    >
       <div className="flex items-center gap-3 px-3 h-11">
         <button
           onClick={onBack}

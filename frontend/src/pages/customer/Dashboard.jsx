@@ -376,19 +376,18 @@ const CustomerDashboard = () => {
       <div 
         className={isIframe 
           ? "h-screen w-full flex flex-col overflow-hidden bg-bg" 
-          : "min-h-screen w-full bg-[#0a0f18] flex justify-center items-center p-0 sm:p-4"
+          : "h-[100dvh] sm:h-screen w-full bg-[#0a0f18] flex justify-center items-center p-0 sm:p-4"
         } 
-        style={{
-          ...brandingStyles,
-          paddingTop: isIframe ? '0px' : 'calc(env(safe-area-inset-top, 0px) + 12px)',
-          paddingBottom: isIframe ? '0px' : 'calc(env(safe-area-inset-bottom, 0px) + 12px)',
-        }}
+        style={brandingStyles}
       >
         <div 
           className={isIframe 
             ? "w-full h-full bg-surface flex flex-col overflow-hidden" 
-            : "w-full max-w-[420px] h-screen sm:h-[720px] bg-surface sm:border sm:border-border/60 sm:rounded-[28px] sm:shadow-2xl flex flex-col overflow-hidden relative"
+            : "w-full max-w-[420px] h-full sm:h-[720px] bg-surface sm:border sm:border-border/60 sm:rounded-[28px] sm:shadow-2xl flex flex-col overflow-hidden relative"
           }
+          style={{
+            paddingBottom: isIframe ? '0px' : 'env(safe-area-inset-bottom, 0px)',
+          }}
         >
           <ChatScreen 
             chatId={activeChat._id} 
@@ -451,15 +450,18 @@ const CustomerDashboard = () => {
     <div 
       className={isIframe 
         ? "h-screen w-full bg-bg overflow-hidden relative" 
-        : "min-h-screen w-full bg-[#0a0f18] flex justify-center items-center p-0 sm:p-4"
+        : "h-[100dvh] sm:h-screen w-full bg-[#0a0f18] flex justify-center items-center p-0 sm:p-4"
       } 
       style={brandingStyles}
     >
       <div 
         className={isIframe 
           ? "w-full h-full bg-bg flex flex-col overflow-y-auto overflow-x-hidden relative scrollbar-none" 
-          : "w-full max-w-[420px] h-screen sm:h-[720px] bg-bg sm:border sm:border-border/60 sm:rounded-[28px] sm:shadow-2xl flex flex-col overflow-y-auto overflow-x-hidden relative scrollbar-none"
+          : "w-full max-w-[420px] h-full sm:h-[720px] bg-bg sm:border sm:border-border/60 sm:rounded-[28px] sm:shadow-2xl flex flex-col overflow-y-auto overflow-x-hidden relative scrollbar-none"
         }
+        style={{
+          paddingBottom: isIframe ? '0px' : 'env(safe-area-inset-bottom, 0px)',
+        }}
       >
       {breakAlert && (
         <div className="fixed top-4 left-4 right-4 z-50 bg-warning/10 border border-warning/30 rounded-lg p-3 flex items-center gap-3 shadow-card animate-slide-in">

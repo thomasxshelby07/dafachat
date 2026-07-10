@@ -220,15 +220,26 @@ const AgentDashboard = () => {
   const statusLabels = { online: 'Online', away: 'Away', break: 'On Break', offline: 'Offline' };
 
   return (
-    <div className="h-screen flex bg-bg overflow-hidden relative">
+    <div className="h-[100dvh] flex bg-bg overflow-hidden relative">
       {/* Sidebar */}
-      <div className={`w-full md:w-[320px] bg-surface border-r border-border flex flex-col flex-shrink-0 transition-all duration-300 ${
-        activeChat ? 'hidden md:flex' : 'flex'
-      }`}>
+      <div 
+        className={`w-full md:w-[320px] bg-surface border-r border-border flex flex-col flex-shrink-0 transition-all duration-300 ${
+          activeChat ? 'hidden md:flex' : 'flex'
+        }`}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
+      >
         {/* Agent Header */}
-        <div className="bg-primary px-5 py-4 flex-shrink-0" style={{ backgroundColor: 'var(--primary)' }}>
+        <div 
+          className="bg-primary px-5 py-4 flex-shrink-0" 
+          style={{ 
+            backgroundColor: 'var(--primary)',
+            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)'
+          }}
+        >
           <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               {user?.avatar ? (
                 <img src={user.avatar} alt="Avatar" className="w-11 h-11 object-cover rounded-full border-2 border-white/30 shadow-md" />
               ) : (
@@ -348,9 +359,14 @@ const AgentDashboard = () => {
       </div>
 
       {/* Right Side */}
-      <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${
-        !activeChat ? 'hidden md:flex' : 'flex'
-      }`}>
+      <div 
+        className={`flex-1 flex flex-col min-w-0 transition-all duration-300 bg-surface ${
+          !activeChat ? 'hidden md:flex' : 'flex'
+        }`}
+        style={{
+          paddingBottom: 'env(safe-area-inset-bottom, 0px)'
+        }}
+      >
         {activeChat ? (
           <div className="h-full"><ChatScreen chatId={activeChat._id} onBack={() => setActiveChat(null)} onMenuClick={() => {}} /></div>
         ) : (

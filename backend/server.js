@@ -862,22 +862,6 @@ io.on('connection', async (socket) => {
     }
     
     logger.info(`Socket disconnected: ${socket.id} (user: ${userId})`);
-    
-    // To prevent immediate reassignment on simple page reload/refresh,
-    // wait a short period and check if they reconnected on a new socket.
-    setTimeout(async () => {
-      const activeSocketsCheck = await io.fetchSockets();
-      const stillConnected = activeSocketsCheck.some(s => s.userId === userId);
-      
-      if (!stillConnected) {
-        const user = await User.findById(userId);
-        if (user && ['agent', 'manager', 'super_admin'].includes(user.role) && user.status !== 'offline') {
-          const { updateUserStatus } = require('./utils/activitySystem');
-          await updateUserStatus(userId, 'offline', io);
-          logger.info(`Automatically set agent ${user.fullName} status to offline due to socket disconnect.`);
-        }
-      }
-    }, 5000);
   });
 });
 
