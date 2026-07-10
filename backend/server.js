@@ -80,7 +80,13 @@ app.use('/api/broadcasts', require('./routes/broadcasts').router);
 app.use('/api/notifications', require('./routes/notifications'));
 
 app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  const mongoose = require('mongoose');
+  res.json({ 
+    status: 'ok', 
+    timestamp: new Date().toISOString(),
+    dbState: mongoose.connection.readyState,
+    dbStateLabel: ['disconnected', 'connected', 'connecting', 'disconnecting'][mongoose.connection.readyState]
+  });
 });
 
 app.patch('/api/users/status', require('./middleware/auth'), async (req, res) => {
