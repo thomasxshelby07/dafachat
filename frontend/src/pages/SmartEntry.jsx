@@ -309,7 +309,7 @@ const SmartEntry = ({ defaultView }) => {
                       </>
                     ) : (
                       <>
-                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                         </svg>
                         <span>Chat for Manual ID</span>
@@ -322,7 +322,7 @@ const SmartEntry = ({ defaultView }) => {
                     onClick={handleAutoIdRegistration}
                     className="w-full text-white font-extrabold py-3.5 px-4 rounded-xl transition-all duration-300 transform hover:scale-[1.02] hover:shadow-xl hover:shadow-slate-900/30 active:scale-[0.98] flex items-center justify-center gap-2 cursor-pointer text-xs tracking-wider uppercase bg-gradient-to-r from-slate-800 to-slate-950 hover:from-slate-700 hover:to-slate-900 border border-slate-700/60 shadow-lg"
                   >
-                    <svg className="w-4.5 h-4.5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg className="w-5 h-5 text-amber-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
                     </svg>
                     <span>Auto Site Registration</span>
@@ -434,7 +434,7 @@ const SmartEntry = ({ defaultView }) => {
                       </>
                     ) : (
                       <>
-                        <svg className="w-4.5 h-4.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                         </svg>
                         <span>Verify & Start Chat</span>

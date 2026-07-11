@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSocket } from '../hooks/useSocket';
 import api from '../hooks/api';
-import { showBrowserNotification, requestNotificationPermission } from '../utils/notifications';
+import { showBrowserNotification, requestNotificationPermission, playNotificationSound } from '../utils/notifications';
 import { useAuth } from '../context/AuthContext';
 
 const NotificationBell = ({ className = 'text-text-2', align = 'right' }) => {
@@ -40,6 +40,7 @@ const NotificationBell = ({ className = 'text-text-2', align = 'right' }) => {
       setUnreadCount(prev => prev + 1);
       
       if (localStorage.getItem('muteNotifications') !== 'true') {
+        playNotificationSound();
         showBrowserNotification(data.title || 'New Notification', {
           body: data.body || '',
           tag: data._id || `notif-${Date.now()}`,
@@ -56,19 +57,11 @@ const NotificationBell = ({ className = 'text-text-2', align = 'right' }) => {
     };
 
     on('new_notification', handlersRef.current.handleNotification);
-    on('lead_assigned', handlersRef.current.handleNotification);
-    on('new_lead', handlersRef.current.handleNotification);
-    on('new_chat_available', handlersRef.current.handleNotification);
-    on('new_chat_assigned', handlersRef.current.handleNotification);
     on('chat_read', handlersRef.current.handleChatRead);
     on('message_read', handlersRef.current.handleMessageRead);
 
     return () => {
       off('new_notification', handlersRef.current.handleNotification);
-      off('lead_assigned', handlersRef.current.handleNotification);
-      off('new_lead', handlersRef.current.handleNotification);
-      off('new_chat_available', handlersRef.current.handleNotification);
-      off('new_chat_assigned', handlersRef.current.handleNotification);
       off('chat_read', handlersRef.current.handleChatRead);
       off('message_read', handlersRef.current.handleMessageRead);
     };

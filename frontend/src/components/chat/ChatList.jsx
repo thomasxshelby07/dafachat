@@ -66,8 +66,12 @@ const ChatList = ({ chats, activeChatId, onSelectChat, user }) => {
             <button
               key={chat._id}
               onClick={() => onSelectChat(chat)}
-              className={`w-full flex items-center gap-2.5 px-3 py-2 transition-all text-left ${
-                isActive ? 'bg-primary-light' : 'hover:bg-bg active:bg-bg'
+              className={`w-full flex items-center gap-3.5 px-4 py-3.5 transition-all duration-200 text-left border-l-4 ${
+                isActive 
+                  ? 'bg-red-500/[0.05] border-primary shadow-sm' 
+                  : unread > 0
+                    ? 'bg-emerald-500/[0.04] border-emerald-500 hover:bg-emerald-500/[0.07]'
+                    : 'bg-white border-transparent hover:bg-slate-50'
               }`}
             >
               {/* Avatar */}
@@ -76,44 +80,49 @@ const ChatList = ({ chats, activeChatId, onSelectChat, user }) => {
                   <img
                     src={chatUser.avatar}
                     alt={displayName}
-                    className="w-9 h-9 object-cover flex-shrink-0 border border-border"
+                    className="w-10 h-10 object-cover flex-shrink-0 border border-slate-200 rounded-full"
                   />
                 ) : (
-                  <div className="w-9 h-9 bg-primary flex items-center justify-center">
-                    <span className="text-xs font-bold text-white">
-                      {isCustomerView ? 'D' : (displayName.charAt(0) || '?')}
+                  <div 
+                    className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-full text-white text-sm font-bold shadow-sm"
+                    style={{
+                      background: `linear-gradient(135deg, ${branding.primaryColor || '#B91C1C'}, ${branding.secondaryColor || '#991B1B'})`
+                    }}
+                  >
+                    <span className="leading-none">
+                      {isCustomerView ? 'D' : (displayName.charAt(0).toUpperCase() || '?')}
                     </span>
                   </div>
                 )}
                 {!isCustomerView && chatUser?.isOnline && (
-                  <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-success border-2 border-surface" />
+                  <span className="absolute bottom-0 right-0 w-3 h-3 bg-success border-2 border-white rounded-full shadow-sm" />
                 )}
                 {unread > 0 && (
-                  <div className="absolute -top-1 -right-1 min-w-[16px] h-[16px] px-1 bg-danger flex items-center justify-center rounded-full">
-                    <span className="text-[8px] font-bold text-white">{unread > 99 ? '99+' : unread}</span>
-                  </div>
+                  <span className="absolute -top-1 -right-1 min-w-[18px] h-4.5 px-1 bg-emerald-500 text-white text-[9px] font-black rounded-full flex items-center justify-center border-2 border-white shadow-md animate-pulse">
+                    {unread > 99 ? '99+' : unread}
+                  </span>
                 )}
               </div>
 
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <div className="flex items-center justify-between gap-1.5">
-                  <h3 className={`text-xs truncate ${unread > 0 ? 'font-bold text-text-1' : 'font-medium text-text-1'}`}>
+                  <h3 className={`text-xs truncate ${unread > 0 ? 'font-bold text-slate-900' : 'font-semibold text-slate-700'}`}>
                     {displayName}
                   </h3>
-                  <span className={`text-[10px] flex-shrink-0 ${unread > 0 ? 'text-primary font-semibold' : 'text-text-3'}`}>
+                  <span className={`text-[10px] flex-shrink-0 ${unread > 0 ? 'text-emerald-600 font-extrabold' : 'text-slate-400 font-medium'}`}>
                     {formatTime(chat.lastMessageAt)}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between gap-1.5 mt-0.5">
-                  <p className={`text-[11px] truncate ${unread > 0 ? 'font-medium text-text-1' : 'text-text-2'}`}>
+                  <p className={`text-[11px] truncate ${unread > 0 ? 'font-semibold text-slate-800' : 'text-slate-500'}`}>
                     {isCustomerView && lastMsg !== 'No messages yet' ? `💬 ${lastMsg}` : lastMsg}
                   </p>
                 </div>
 
                 {!isCustomerView && (
-                  <div className="flex items-center gap-1 mt-0.5">
+                  <div className="flex items-center gap-1.5 mt-1">
                     {chat.issueType && (
                       <span className={`text-[9px] font-bold px-1.5 py-0.5 border border-current/20 ${
                         chat.issueType === 'deposit' ? 'bg-blue-50 text-blue-600' :

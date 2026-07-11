@@ -337,7 +337,7 @@ const AgentDashboard = () => {
               }`}
               style={filter === key ? { backgroundColor: 'var(--primary)', borderColor: 'var(--primary)' } : {}}
             >
-              {label.toUpperCase()}{count > 0 && <span className="ml-1 px-1.5 py-0.2 bg-white/20 rounded-full text-[9px] font-bold">{count}</span>}
+              {label.toUpperCase()}{count > 0 && <span className={`ml-1.5 px-1.5 py-0.5 rounded-full text-[9px] font-bold ${key === 'unread' ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white/20 text-inherit'}`}>{count}</span>}
             </button>
           ))}
         </div>
