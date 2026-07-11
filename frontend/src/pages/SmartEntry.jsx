@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams, useLocation, Link } from 'react-router-do
 import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '../context/AuthContext';
 import { useBranding } from '../context/BrandingContext';
+import api from '../hooks/api';
 
 const VIEW = { NEW_ID: 'new_id', EXISTING_ID: 'existing_id' };
 
@@ -12,6 +13,31 @@ const SmartEntry = ({ defaultView }) => {
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
+
+  const [banners, setBanners] = useState([]);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+
+  // Load public banners on mount
+  useEffect(() => {
+    const loadPublicBanners = async () => {
+      try {
+        const res = await api.get('/api/banners/public');
+        setBanners(res.data.banners || []);
+      } catch (err) {
+        console.error('Failed to load public banners:', err);
+      }
+    };
+    loadPublicBanners();
+  }, []);
+
+  // Banner slideshow auto-play
+  useEffect(() => {
+    if (banners.length <= 1) return;
+    const interval = setInterval(() => {
+      setActiveBannerIndex((prev) => (prev + 1) % banners.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [banners]);
 
   // Dynamic embed detection
   const isEmbed = searchParams.get('embed') === 'true';
@@ -166,8 +192,8 @@ const SmartEntry = ({ defaultView }) => {
         <div
           className={
             isEmbed
-              ? "w-full p-4 flex flex-col justify-start"
-              : "w-full min-h-screen sm:min-h-0 flex-1 sm:flex-initial sm:rounded-3xl p-8 sm:p-9 backdrop-blur-xl transition-all duration-300 flex flex-col justify-center shadow-2xl relative overflow-hidden"
+              ? "w-full flex flex-col justify-start"
+              : "w-full min-h-screen sm:min-h-0 flex-1 sm:flex-initial sm:rounded-3xl backdrop-blur-xl transition-all duration-300 flex flex-col justify-center shadow-2xl relative overflow-hidden"
           }
           style={{
             ...cardStyle,
@@ -183,6 +209,50 @@ const SmartEntry = ({ defaultView }) => {
               <div className="absolute -bottom-24 -right-24 w-48 h-48 rounded-full bg-red-500/10 blur-3xl pointer-events-none" />
             </>
           )}
+
+          {/* ── Banner Area ── */}
+          {!isEmbed && view === VIEW.NEW_ID && banners.length > 0 && (
+            <div className="w-full h-[150px] relative overflow-hidden bg-slate-950 border-b border-border/10 flex-shrink-0">
+              {banners.map((banner, index) => (
+                <div
+                  key={banner._id}
+                  className={`absolute inset-0 transition-opacity duration-700 flex items-center justify-center ${
+                    index === activeBannerIndex ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'
+                  }`}
+                >
+                  <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover opacity-85" />
+                  {banner.title && (
+                    <div className="absolute bottom-2 left-3 right-3 text-white drop-shadow-md">
+                      <p className="text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                        {banner.type}
+                      </p>
+                      <h4 className="text-xs font-bold leading-tight">{banner.title}</h4>
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Carousel Dots */}
+              {banners.length > 1 && (
+                <div className="absolute bottom-2 right-3 z-20 flex gap-1">
+                  {banners.map((_, index) => (
+                    <button
+                      key={index}
+                      onClick={() => setActiveBannerIndex(index)}
+                      className={`w-1.5 h-1.5 rounded-full transition-all ${
+                        index === activeBannerIndex ? 'bg-amber-400 scale-125' : 'bg-white/40'
+                      }`}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          <div className={
+            isEmbed
+              ? "w-full p-4 flex flex-col justify-start flex-1"
+              : "w-full p-8 sm:p-9 flex flex-col justify-center flex-1"
+          }>
 
           {/* Logo & Header */}
           <div className="text-center mb-7">
@@ -458,6 +528,7 @@ const SmartEntry = ({ defaultView }) => {
               </motion.form>
             )}
           </AnimatePresence>
+          </div>
         </div>
       </motion.div>
     </div>
