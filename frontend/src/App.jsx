@@ -39,11 +39,11 @@ function App() {
       <Routes>
         {/* Smart entry — replaces both /login and /register for customers */}
         <Route path="/login" element={
-          isAuthenticated ? customerRedirect : <SmartEntry />
+          isAuthenticated ? customerRedirect : <SmartEntry defaultView="existing_id" />
         } />
 
         <Route path="/register" element={
-          isAuthenticated ? customerRedirect : <SmartEntry />
+          isAuthenticated ? customerRedirect : <SmartEntry defaultView="new_id" />
         } />
 
         <Route path="/admin-login" element={
