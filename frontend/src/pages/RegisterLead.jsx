@@ -248,15 +248,15 @@ const RegisterLead = () => {
         >
           {/* ── Banner Area ── */}
           {banners.length > 0 ? (
-            <div className="w-full h-[180px] relative overflow-hidden bg-slate-900 border-b border-border/10">
+            <div className="w-full relative overflow-hidden bg-slate-900 border-b border-border/10">
               {banners.map((banner, index) => (
                 <div
                   key={banner._id}
-                  className={`absolute inset-0 transition-opacity duration-700 flex items-center justify-center ${
-                    index === activeBannerIndex ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'
+                  className={`transition-opacity duration-700 ${
+                    index === activeBannerIndex ? 'relative z-10 opacity-100' : 'absolute inset-0 opacity-0 pointer-events-none'
                   }`}
                 >
-                  <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover opacity-85" />
+                  <img src={banner.imageUrl} alt={banner.title} className="w-full h-auto block opacity-85" />
                   {banner.title && (
                     <div className="absolute bottom-2 left-3 right-3 text-white drop-shadow-md">
                       <p className="text-[9px] font-bold uppercase tracking-wider text-primary-light" style={{ color: primaryColor }}>
@@ -269,7 +269,7 @@ const RegisterLead = () => {
               ))}
               {/* Carousel Dots */}
               {banners.length > 1 && (
-                <div className="absolute bottom-2 right-3 z-20 flex gap-1">
+                <div className="absolute bottom-2 right-3 z-30 flex gap-1">
                   {banners.map((_, index) => (
                     <button
                       key={index}

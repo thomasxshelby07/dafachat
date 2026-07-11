@@ -212,17 +212,17 @@ const SmartEntry = ({ defaultView }) => {
 
           {/* ── Banner Area ── */}
           {!isEmbed && view === VIEW.NEW_ID && banners.length > 0 && (
-            <div className="w-full h-[150px] relative overflow-hidden bg-slate-950 border-b border-border/10 flex-shrink-0">
+            <div className="w-full relative overflow-hidden bg-slate-950 border-b border-border/10 flex-shrink-0">
               {banners.map((banner, index) => (
                 <div
                   key={banner._id}
-                  className={`absolute inset-0 transition-opacity duration-700 flex items-center justify-center ${
-                    index === activeBannerIndex ? 'opacity-100 z-10' : 'opacity-0 pointer-events-none'
+                  className={`transition-opacity duration-700 ${
+                    index === activeBannerIndex ? 'relative z-10 opacity-100' : 'absolute inset-0 opacity-0 pointer-events-none'
                   }`}
                 >
-                  <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover opacity-85" />
+                  <img src={banner.imageUrl} alt={banner.title} className="w-full h-auto block opacity-85" />
                   {banner.title && (
-                    <div className="absolute bottom-2 left-3 right-3 text-white drop-shadow-md">
+                    <div className="absolute bottom-2 left-3 right-3 text-white drop-shadow-md z-20">
                       <p className="text-[9px] font-bold uppercase tracking-wider text-amber-400">
                         {banner.type}
                       </p>
@@ -233,7 +233,7 @@ const SmartEntry = ({ defaultView }) => {
               ))}
               {/* Carousel Dots */}
               {banners.length > 1 && (
-                <div className="absolute bottom-2 right-3 z-20 flex gap-1">
+                <div className="absolute bottom-2 right-3 z-30 flex gap-1">
                   {banners.map((_, index) => (
                     <button
                       key={index}
@@ -251,11 +251,11 @@ const SmartEntry = ({ defaultView }) => {
           <div className={
             isEmbed
               ? "w-full p-4 flex flex-col justify-start flex-1"
-              : "w-full p-8 sm:p-9 flex flex-col justify-center flex-1"
+              : "w-full p-6 sm:p-9 flex flex-col justify-center flex-1"
           }>
 
           {/* Logo & Header */}
-          <div className="text-center mb-7">
+          <div className="text-center mb-5">
             <div className="flex justify-center mb-4">
               {branding?.logo ? (
                 <img src={branding.logo} alt="Logo" className="h-11 object-contain transition-transform hover:scale-105" />
@@ -312,13 +312,6 @@ const SmartEntry = ({ defaultView }) => {
                 onSubmit={handleManualIdCreation}
                 className="space-y-5"
               >
-                <div className="p-3.5 bg-amber-500/10 border border-amber-500/20 text-amber-200 text-[11px] rounded-xl flex items-start gap-2.5 leading-relaxed">
-                  <svg className="w-5 h-5 text-amber-400 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                  <span>Deposit, withdrawal, and player dashboard functions will unlock immediately post registration.</span>
-                </div>
-
                 <div>
                   <label htmlFor="lead-name" className={labelCls}>Your Full Name</label>
                   <div className={`${inputWrapperCls} group`}>

@@ -733,18 +733,20 @@ const CustomerDashboard = () => {
 
             {/* Banners Carousel / Fallback Header Banner */}
             {!isEmbed && (
-              <div className="relative h-[180px] w-full bg-gradient-to-r from-primary-light to-primary-light/50 overflow-hidden select-none border-b border-border">
+              <div className={`relative w-full bg-gradient-to-r from-primary-light to-primary-light/50 overflow-hidden select-none border-b border-border ${
+                banners.length > 0 ? '' : 'h-[180px]'
+              }`}>
                 {banners.length > 0 ? (
                   banners.map((banner, index) => (
                     <div
                       key={banner._id}
-                      className={`absolute inset-0 transition-opacity duration-1000 ${
-                        index === activeBannerIndex ? 'opacity-100' : 'opacity-0 pointer-events-none'
+                      className={`transition-opacity duration-1000 ${
+                        index === activeBannerIndex ? 'relative z-10 opacity-100' : 'absolute inset-0 opacity-0 pointer-events-none'
                       }`}
                     >
-                      <img src={banner.imageUrl} alt={banner.title} className="w-full h-full object-cover" />
+                      <img src={banner.imageUrl} alt={banner.title} className="w-full h-auto block" />
                       {banner.title && (
-                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 text-white">
+                        <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/80 to-transparent px-4 py-3 text-white z-20">
                           <p className="text-[10px] font-bold uppercase tracking-wider opacity-85">{banner.type}</p>
                           <h4 className="text-xs font-semibold mt-0.5">{banner.title}</h4>
                         </div>
@@ -763,7 +765,7 @@ const CustomerDashboard = () => {
 
                 {/* Banner indicators (dots) - centered */}
                 {banners.length > 1 && (
-                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-10">
+                  <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1 z-30">
                     {banners.map((_, index) => (
                       <button
                         key={index}
